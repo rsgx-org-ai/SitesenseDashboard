@@ -1,0 +1,3 @@
+# No third-party dependencies - fetch_data.py and server.py are stdlib only
+# (urllib, http.server, json). This file exists so Railway's Nixpacks builder
+# detects the project as Python and installs the right runtime.

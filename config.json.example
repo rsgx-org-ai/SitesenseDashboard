@@ -1,0 +1,5 @@
+{
+  "api_endpoint": "https://gateway.sitesensecloud.com/sitesenseapi/prod/query",
+  "auth_header_value": "REPLACE_WITH_REAL_AUTH_HEADER_VALUE",
+  "trend_window_days": 90
+}

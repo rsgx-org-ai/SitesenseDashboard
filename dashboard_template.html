@@ -1,0 +1,2674 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RSGx PMO Dashboard | SiteSense</title>
+<style>
+  /* Neutrals are tinted toward the RSGx red hue (~27) rather than pure grey,
+     so the whole surface reads as one family. No pure black or white anywhere. */
+  :root {
+    color-scheme: light;
+    --surface:        oklch(99.2% 0.002 27);
+    --surface-sunk:   oklch(97.2% 0.004 27);
+    --surface-raised: oklch(100% 0 0 / 0);
+    --ink:            oklch(19% 0.008 27);
+    --ink-2:          oklch(43% 0.008 27);
+    --ink-3:          oklch(53% 0.008 27); /* 53% clears 4.5:1 AA on the light surface for the small labels this ink carries */
+    --rule:           oklch(91% 0.005 27);
+    --rule-strong:    oklch(84% 0.006 27);
+    --accent:         oklch(54% 0.216 27);
+    --accent-sunk:    oklch(96% 0.021 27);
+
+    --s1: oklch(55% 0.16 255); --s2: oklch(66% 0.17 45);  --s3: oklch(66% 0.13 165);
+    --s4: oklch(74% 0.15 85);  --s5: oklch(72% 0.12 355); --s6: oklch(52% 0.15 145);
+    --s7: oklch(42% 0.17 285); --s8: oklch(62% 0.19 25);
+
+    --ok:    oklch(58% 0.16 145);
+    --warn:  oklch(78% 0.16 85);
+    --alert: oklch(56% 0.19 25);
+
+    --step-1: 11px; --step0: 13px; --step1: 16.5px; --step2: 21px; --step3: 27px;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface:      oklch(17.5% 0.006 27);
+      --surface-sunk: oklch(21% 0.007 27);
+      --ink:          oklch(97% 0.003 27);
+      --ink-2:        oklch(78% 0.006 27);
+      --ink-3:        oklch(63% 0.007 27);
+      --rule:         oklch(28% 0.008 27);
+      --rule-strong:  oklch(36% 0.009 27);
+      --accent:       oklch(66% 0.19 27);
+      --accent-sunk:  oklch(26% 0.05 27);
+      --s1: oklch(64% 0.16 255); --s2: oklch(62% 0.17 45);  --s3: oklch(62% 0.12 165);
+      --s4: oklch(66% 0.14 85);  --s5: oklch(64% 0.14 355); --s6: oklch(58% 0.15 145);
+      --s7: oklch(68% 0.15 285); --s8: oklch(66% 0.18 25);
+      --ok:    oklch(66% 0.16 145);
+      --warn:  oklch(76% 0.15 85);
+      --alert: oklch(66% 0.19 25);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface:      oklch(17.5% 0.006 27);
+    --surface-sunk: oklch(21% 0.007 27);
+    --ink:          oklch(97% 0.003 27);
+    --ink-2:        oklch(78% 0.006 27);
+    --ink-3:        oklch(63% 0.007 27);
+    --rule:         oklch(28% 0.008 27);
+    --rule-strong:  oklch(36% 0.009 27);
+    --accent:       oklch(66% 0.19 27);
+    --accent-sunk:  oklch(26% 0.05 27);
+    --s1: oklch(64% 0.16 255); --s2: oklch(62% 0.17 45);  --s3: oklch(62% 0.12 165);
+    --s4: oklch(66% 0.14 85);  --s5: oklch(64% 0.14 355); --s6: oklch(58% 0.15 145);
+    --s7: oklch(68% 0.15 285); --s8: oklch(66% 0.18 25);
+    --ok:    oklch(66% 0.16 145);
+    --warn:  oklch(76% 0.15 85);
+    --alert: oklch(66% 0.19 25);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--ink);
+    font: var(--step0)/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1, h2, h3 { margin: 0; font-weight: 620; letter-spacing: -0.011em; }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    flex-wrap: wrap;
+    padding: 18px 28px 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .wordmark { display: flex; align-items: baseline; gap: 10px; }
+  .wordmark .rule { width: 22px; height: 3px; background: var(--accent); border-radius: 2px;
+                    transform: translateY(-4px); }
+  .wordmark h1 { font-size: var(--step1); }
+  .wordmark span { color: var(--ink-3); font-size: var(--step0); }
+  .stamp { color: var(--ink-3); font-size: var(--step-1); font-variant-numeric: tabular-nums; }
+  .refresh-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .refresh-btn { padding: 6px 12px; min-height: 30px; font-size: var(--step-1); }
+  .refresh-btn[disabled] { opacity: 0.55; cursor: default; }
+  .refresh-status { font-size: var(--step-1); color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
+  .refresh-status.is-running .dot::before { animation: pulse 1.1s ease-in-out infinite; }
+  .refresh-status.is-error { color: var(--alert); }
+  .refresh-status.is-done { color: var(--ok); }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .refresh-status.is-running .dot::before { animation: none; } }
+
+  /* ---------- tabs ---------- */
+  .tabstrip {
+    display: flex; gap: 2px; padding: 0 20px; overflow-x: auto;
+    border-bottom: 1px solid var(--rule); scrollbar-width: thin;
+  }
+  .tabstrip button {
+    flex: none; appearance: none; background: none; border: 0;
+    padding: 11px 13px 9px; margin-bottom: -1px;
+    font: 590 var(--step0)/1 system-ui, sans-serif; color: var(--ink-3);
+    border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+    transition: color 160ms var(--ease);
+  }
+  .tabstrip button:hover { color: var(--ink); }
+  .tabstrip button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  /* The configuration tab is pushed right and set apart: it changes settings
+     rather than showing data, so it should not read as another view. */
+  .tabstrip button[data-config="true"] { margin-left: auto; color: var(--ink-3); }
+  .tabstrip button[data-config="true"]::before { content: "⚙"; margin-right: 6px; font-size: 12px; }
+
+  select.region-pick, input.deliv-pick {
+    appearance: auto; font: var(--step0) system-ui, sans-serif; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--rule-strong);
+    border-radius: 5px; padding: 3px 6px;
+  }
+  /* A derived default reads quieter than a date someone typed in. */
+  input.deliv-default { color: var(--ink-2); border-style: dashed; }
+
+  main { padding: 20px 28px 72px; }
+  .lede { color: var(--ink-2); max-width: 68ch; margin: 0 0 20px; }
+
+  /* ---------- filter rail ---------- */
+  .rail {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 14px;
+    padding: 12px 14px; margin-bottom: 18px;
+    background: var(--surface-sunk); border: 1px solid var(--rule); border-radius: 9px;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .field > label {
+    font-size: var(--step-1); font-weight: 600; letter-spacing: 0.03em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  /* Text inputs and selects only. Checkboxes live inside .field via the project
+     picker and must keep their native box, not inherit field sizing. */
+  .field input:not([type="checkbox"]), .field select {
+    appearance: none; font: var(--step0) system-ui, sans-serif; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 6px;
+    padding: 6px 9px; min-height: 32px;
+    /* Selects otherwise stretch to their longest option, which blows the rail
+       out to several rows once cost codes and locations are in play. */
+    max-width: 230px; text-overflow: ellipsis;
+  }
+  .field select { padding-right: 26px;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 14px) 14px, calc(100% - 9px) 14px;
+    background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+  .field input:focus-visible, .field select:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+  .field input[type="search"] { min-width: 230px; }
+  .rail .spacer { flex: 1 1 auto; }
+  .btn {
+    appearance: none; font: 590 var(--step0) system-ui, sans-serif; cursor: pointer;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--rule-strong); border-radius: 6px; padding: 7px 12px; min-height: 32px;
+  }
+  .btn:hover { border-color: var(--ink-3); }
+  .btn-quiet { background: none; border-color: transparent; color: var(--ink-2); }
+  .btn-quiet:hover { color: var(--ink); border-color: var(--rule-strong); }
+
+  /* project picker */
+  .picker { position: relative; }
+  .picker-pop {
+    position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: min(400px, 88vw);
+    display: none; flex-direction: column; max-height: 380px;
+    background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 9px;
+    box-shadow: 0 10px 30px oklch(0% 0 0 / 0.16); padding: 10px;
+  }
+  .picker-pop[data-open="true"] { display: flex; }
+  /* max-width comes from the shared field rule and must be released here so the
+     search box fills the popover rather than stopping at the rail control width. */
+  .picker-pop input[type="search"] { width: 100%; max-width: none; margin-bottom: 8px; }
+  .picker-actions { display: flex; gap: 6px; margin-bottom: 8px; }
+  .picker-list { overflow-y: auto; flex: 1; margin: 0 -4px; }
+  .picker-list label {
+    display: flex; gap: 9px; align-items: flex-start; padding: 5px 6px; border-radius: 5px;
+    cursor: pointer; line-height: 1.35;
+  }
+  .picker-list label:hover { background: var(--surface-sunk); }
+  .picker-list input[type="checkbox"] {
+    flex: none; width: 14px; height: 14px; min-height: 0; margin: 2px 0 0;
+    padding: 0; max-width: none; accent-color: var(--accent); appearance: auto;
+  }
+
+  /* ---------- stat strip (deliberately not a grid of cards) ---------- */
+  /* Grid rather than flex so the cells stay equal and a trailing metric never
+     ends up stranded alone on a second row. The 1px gap over a ruled background
+     draws the dividers, which keeps them correct in both axes when it wraps. */
+  .strip {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 1px; margin-bottom: 22px; background: var(--rule);
+    border: 1px solid var(--rule); border-radius: 9px; overflow: hidden;
+  }
+  .strip > div { background: var(--surface); padding: 11px 15px 12px; }
+  .strip dt {
+    font-size: var(--step-1); font-weight: 600; letter-spacing: 0.03em;
+    text-transform: uppercase; color: var(--ink-3); margin-bottom: 3px;
+  }
+  .strip dd {
+    margin: 0; font-size: var(--step2); font-weight: 640; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; line-height: 1.15;
+  }
+  .strip dd small { font-size: var(--step-1); font-weight: 500; color: var(--ink-3); margin-left: 4px; }
+  .strip dd.flag-alert { color: var(--alert); }
+
+  /* ---------- blocks ---------- */
+  .block { margin-bottom: 26px; }
+  .block > h3 { font-size: var(--step0); margin-bottom: 3px; }
+  .block > .hint { color: var(--ink-3); font-size: var(--step-1); margin: 0 0 11px; }
+  /* Reserve two lines so a one-line hint next to a two-line one still leaves both
+     charts starting on the same baseline. */
+  .split .block > .hint { min-height: 2.6em; }
+  /* Equal columns keep both charts at the same scale factor. An uneven split
+     shrinks the narrower chart's text below a readable size once the SVG is
+     scaled down to fit. */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+  @media (max-width: 940px) { .split { grid-template-columns: 1fr; } }
+
+  .notice {
+    padding: 12px 14px; border: 1px solid var(--rule); border-radius: 8px;
+    background: var(--surface-sunk); color: var(--ink-2); max-width: 74ch;
+  }
+  .notice strong { color: var(--ink); }
+  .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px; align-items: start; }
+  .notes .notice { max-width: none; margin: 0 !important; }
+  @media (max-width: 940px) { .notes { grid-template-columns: 1fr; } }
+  /* Long-form caveats collapse so they do not out-weigh the table they describe,
+     while the headline stays visible. */
+  details.notice { padding: 0; }
+  details.notice > summary {
+    cursor: pointer; padding: 12px 14px; list-style: none; color: var(--ink);
+    display: flex; gap: 8px; align-items: baseline;
+  }
+  details.notice > summary::-webkit-details-marker { display: none; }
+  details.notice > summary::before {
+    content: "▸"; color: var(--ink-3); font-size: 11px; transition: transform 140ms var(--ease);
+  }
+  details.notice[open] > summary::before { transform: rotate(90deg); }
+  details.notice > div { padding: 0 14px 12px 30px; }
+
+  /* ---------- charts ---------- */
+  svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+  .tick { fill: var(--ink-3); font-size: 10px; }
+  .grid { stroke: var(--rule); }
+  /* Whole-row hit target sits above the mark so the label and value are clickable
+     too, giving a target far larger than the bar itself. */
+  .hit { fill: transparent; cursor: pointer; }
+  .hit:hover ~ *, .chart g.row:hover .bar { opacity: 1; }
+  .chart g.row .bar { transition: opacity 140ms var(--ease); }
+  .chart g.row:hover .bar { opacity: 0.74; }
+  .chart g.row:hover .rowlabel { fill: var(--ink); }
+  .hit:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .chart .pt-hit { fill: transparent; cursor: pointer; }
+  .chart .pt-hit:hover + .pt, .chart .pt-hit:focus-visible + .pt { r: 6; }
+  .pickhint { color: var(--ink-3); font-size: var(--step-1); margin: 0 0 9px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px; padding: 4px 6px 4px 10px;
+    border: 1px solid var(--rule-strong); border-radius: 999px; background: var(--accent-sunk);
+    font-size: var(--step-1); color: var(--ink);
+  }
+  .chip button {
+    appearance: none; border: 0; background: none; cursor: pointer; color: var(--ink-2);
+    font-size: 14px; line-height: 1; padding: 0 3px; border-radius: 50%;
+  }
+  .chip button:hover { color: var(--accent); }
+  .key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 9px;
+         font-size: var(--step-1); color: var(--ink-2); }
+  .key i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+
+  .tip {
+    position: fixed; z-index: 60; pointer-events: none; display: none;
+    background: var(--ink); color: var(--surface); font-size: var(--step-1); line-height: 1.4;
+    padding: 6px 9px; border-radius: 6px; max-width: 320px;
+  }
+
+  /* ---------- tables ---------- */
+  .tablewrap { border: 1px solid var(--rule); border-radius: 9px; overflow: hidden; }
+  /* A bounded scroll box gives the table a stable footprint next to the charts
+     and makes the sticky header actually stick, instead of the table running on
+     for fifty rows and dwarfing everything above it. */
+  .tablescroll { overflow: auto; max-height: min(58vh, 560px); overscroll-behavior: contain; }
+  table { width: 100%; border-collapse: collapse; font-size: var(--step0); }
+  thead th {
+    position: sticky; top: 0; z-index: 1; text-align: left;
+    background: var(--surface-sunk); color: var(--ink-2);
+    font-size: var(--step-1); font-weight: 620; letter-spacing: 0.02em;
+    padding: 7px 10px 8px; border-bottom: 1px solid var(--rule-strong);
+    vertical-align: top;
+  }
+  .th-label { cursor: pointer; user-select: none; white-space: nowrap; padding-bottom: 5px; }
+  .th-label:hover { color: var(--ink); }
+  .th-label .dir { color: var(--accent); }
+  .th-filter {
+    display: block; width: 100%; max-width: 220px; box-sizing: border-box; font-family: inherit;
+    font-size: var(--step-1); font-weight: 400; letter-spacing: normal;
+    padding: 3px 6px; border: 1px solid var(--rule); border-radius: 5px;
+    background-color: var(--surface); color: var(--ink); text-overflow: ellipsis;
+  }
+  .th-filter::placeholder { color: var(--ink-3); }
+  /* Only the dropdown form needs a custom arrow; the search-box fallback for
+     high-cardinality columns (e.g. Material, with tens of thousands of
+     distinct names - too many for a usable <select>) stays a plain text box. */
+  select.th-filter {
+    appearance: none; padding-right: 20px;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 12px) 9px, calc(100% - 7px) 9px;
+    background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+  }
+  tbody td { padding: 7px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: var(--surface-sunk); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .clip { display: block; max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clip-wide { max-width: 46ch; }
+  .sub { display: block; color: var(--ink-3); font-size: var(--step-1); }
+  .zero { color: var(--ink-3); }
+  .short { color: var(--alert); font-weight: 600; }
+
+  .dot { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+  .dot::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none;
+    transform: translateY(-1px); background: var(--ink-3);
+  }
+  .dot-ok::before    { background: var(--ok); }
+  .dot-warn::before  { background: var(--warn); }
+  .dot-alert::before { background: var(--alert); }
+
+  .tfoot {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    flex-wrap: wrap; padding: 9px 12px; border-top: 1px solid var(--rule);
+    background: var(--surface-sunk); color: var(--ink-2); font-size: var(--step-1);
+  }
+  .tfoot .pages { display: flex; align-items: center; gap: 6px; }
+  .tfoot button { padding: 4px 10px; min-height: 26px; }
+  .tfoot button[disabled] { opacity: 0.4; cursor: default; }
+  .tfoot button[disabled]:hover { border-color: var(--rule-strong); }
+  .btn-export { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .btn-export:hover { background: var(--accent-sunk); border-color: var(--accent); }
+  .btn-export::before { content: "\2913"; margin-right: 6px; }
+
+  .empty { padding: 26px 14px; text-align: center; color: var(--ink-3); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wordmark">
+    <span class="rule" aria-hidden="true"></span>
+    <h1>RSGx PMO Dashboard</h1>
+    <span>SiteSense</span>
+  </div>
+  <div class="refresh-group">
+    <p class="stamp" id="stamp"></p>
+    <span class="refresh-status" id="refreshStatus"></span>
+    <button class="btn refresh-btn" id="refreshBtn" type="button" title="Pulls fresh data from SiteSense now, instead of waiting for the next scheduled run">Refresh data</button>
+  </div>
+</header>
+
+<nav class="tabstrip" id="tabstrip" role="tablist"></nav>
+<main id="stage"></main>
+<div class="tip" id="tip" role="status"></div>
+
+<script>
+/*__SITESENSE_DATA__*/
+
+const D = SITESENSE_DATA;
+const STR = D.strings;
+const S = i => STR[i] || '';
+const PROJ = D.projects.map(p => p.name);
+
+// materials: [nameIdx, descIdx, uomIdx, typeIdx, guidIdx]
+const matName = m => S(D.materials[m][0]);
+const matDesc = m => S(D.materials[m][1]);
+const matUom  = m => S(D.materials[m][2]);
+const matType = m => S(D.materials[m][3]);
+const matGuid = m => S(D.materials[m][4]);
+
+/* ---------------------------------------------------------------- regions
+   Region is not a SiteSense field. It is an RSGx overlay kept in regions.json,
+   baked in by the refresh script. Edits made on the Regions page are held in
+   this browser straight away; downloading regions.json back into the project
+   folder is what makes them outlast the next refresh. */
+const REGION_KEY = 'rsgx.sitesense.regions.v1';
+const REGION_CHOICES = ['East', 'West'];
+
+const regionByProject = (() => {
+  const map = D.projects.map(p => p.region || '');
+  try {
+    const saved = JSON.parse(localStorage.getItem(REGION_KEY) || '{}');
+    D.projects.forEach((p, i) => {
+      if (Object.prototype.hasOwnProperty.call(saved, String(p.id))) map[i] = saved[String(p.id)] || '';
+    });
+  } catch (e) { /* unreadable or blocked storage: fall back to the baked values */ }
+  return map;
+})();
+const regionOf = i => regionByProject[i] || '';
+
+function saveRegions() {
+  const out = {};
+  D.projects.forEach((p, i) => { out[String(p.id)] = regionOf(i); });
+  try { localStorage.setItem(REGION_KEY, JSON.stringify(out)); return true; }
+  catch (e) { return false; }
+}
+
+// Mirrors the derivation in fetch_data.py: trust the AU-XX code, guess nothing else.
+function suggestRegion(name) {
+  const u = (name || '').toUpperCase();
+  if (u.includes('AU-WA')) return 'West';
+  if (['AU-QLD', 'AU-NSW', 'AU-VIC', 'AU-ACT', 'AU-TAS'].some(c => u.includes(c))) return 'East';
+  return '';
+}
+
+/* --------------------------------------------------- delivery date overlay
+   Estimated Delivery Date and Promised Delivery Date are real PO-line fields
+   RSGx uses day to day - confirmed directly on SiteSense's own PO Dashboard
+   report, with values that genuinely differ from the PO's created date - but
+   neither is reachable through this GraphQL API (checked exhaustively against
+   the exact PO line the UI displayed a value for). Kept the same way as
+   regions: an overlay entered here, keyed by material GUID so it survives a
+   refresh reordering rows, held in this browser immediately, and downloaded to
+   delivery_dates.json to bake into the next refresh for everyone. */
+const DELIVERY_KEY = 'rsgx.sitesense.delivery_dates.v1';
+const DELIVERY_FIELDS = ['estimated', 'promised'];
+
+const deliveryDates = (() => {
+  const map = {};
+  Object.entries(D.delivery_dates || {}).forEach(([guid, v]) => { map[guid] = { ...v }; });
+  try {
+    const saved = JSON.parse(localStorage.getItem(DELIVERY_KEY) || '{}');
+    Object.entries(saved).forEach(([guid, v]) => { map[guid] = { ...(map[guid] || {}), ...v }; });
+  } catch (e) { /* unreadable or blocked storage: fall back to the baked values */ }
+  return map;
+})();
+const deliveryDateOf = (m, field) => (deliveryDates[matGuid(m)] || {})[field] || '';
+function setDeliveryDate(m, field, value) {
+  const g = matGuid(m);
+  const cur = { ...(deliveryDates[g] || {}) };
+  if (value) cur[field] = value; else delete cur[field];
+  if (Object.keys(cur).length) deliveryDates[g] = cur; else delete deliveryDates[g];
+}
+function saveDeliveryDates() {
+  try { localStorage.setItem(DELIVERY_KEY, JSON.stringify(deliveryDates)); return true; }
+  catch (e) { return false; }
+}
+
+const SERIES = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
+const cvar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nf = n => (n ?? 0).toLocaleString('en-AU', {maximumFractionDigits: 2});
+const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+
+// ---------------------------------------------------------------- tooltip
+const tipEl = document.getElementById('tip');
+function tipShow(e, html) {
+  tipEl.innerHTML = html; tipEl.style.display = 'block';
+  const r = tipEl.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY + 16;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 12;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 12;
+  tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
+}
+const tipHide = () => { tipEl.style.display = 'none'; };
+
+// ---------------------------------------------------------------- global project filter
+let selectedProjects = null;                 // null means every project
+let activeRegion = '';                       // '' means every region
+
+// The picker's checkboxes track only the project choice, so a region filter
+// never appears to untick projects the user selected by hand.
+const projectSelected = pIdx => selectedProjects === null || selectedProjects.has(pIdx);
+const inScope = pIdx => projectSelected(pIdx)
+  && (!activeRegion || (activeRegion === 'Unassigned' ? !regionOf(pIdx) : regionOf(pIdx) === activeRegion));
+
+function projectPicker(onChange) {
+  const node = el(`
+    <div class="field picker">
+      <label for="projbtn">Project</label>
+      <button class="btn" id="projbtn" aria-haspopup="true" aria-expanded="false">All 35 projects</button>
+      <div class="picker-pop" data-open="false">
+        <input type="search" placeholder="Search projects" aria-label="Search projects">
+        <div class="picker-actions">
+          <button class="btn btn-quiet" data-act="all">Select all</button>
+          <button class="btn btn-quiet" data-act="none">Clear</button>
+          <button class="btn" data-act="apply">Apply</button>
+        </div>
+        <div class="picker-list"></div>
+      </div>
+    </div>`);
+
+  const btn = node.querySelector('#projbtn');
+  const pop = node.querySelector('.picker-pop');
+  const list = node.querySelector('.picker-list');
+  const search = node.querySelector('input[type="search"]');
+
+  list.innerHTML = PROJ.map((n, i) =>
+    `<label><input type="checkbox" value="${i}" ${projectSelected(i) ? 'checked' : ''}><span>${esc(n)}</span></label>`
+  ).join('');
+
+  const label = () => {
+    btn.textContent = selectedProjects === null
+      ? `All ${PROJ.length} projects`
+      : selectedProjects.size === 1
+        ? PROJ[[...selectedProjects][0]].replace(/^Procore:\s*/, '').slice(0, 30)
+        : `${selectedProjects.size} of ${PROJ.length} projects`;
+    btn.title = selectedProjects === null ? 'All projects included'
+      : [...selectedProjects].map(i => PROJ[i]).join('\n');
+  };
+  label();
+
+  /* Charts can change the project scope directly, so the picker has to be able
+     to re-read the shared state rather than only writing to it. */
+  node.sync = () => {
+    label();
+    list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.checked = projectSelected(+cb.value);
+    });
+  };
+
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    const open = pop.dataset.open === 'true';
+    pop.dataset.open = String(!open);
+    btn.setAttribute('aria-expanded', String(!open));
+    if (!open) search.focus();
+  };
+  pop.onclick = e => e.stopPropagation();
+  document.addEventListener('click', () => { pop.dataset.open = 'false'; btn.setAttribute('aria-expanded','false'); });
+
+  search.oninput = () => {
+    const q = search.value.toLowerCase();
+    list.querySelectorAll('label').forEach(l => {
+      l.style.display = l.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  };
+  node.querySelector('[data-act="all"]').onclick = () =>
+    list.querySelectorAll('input').forEach(c => c.checked = true);
+  node.querySelector('[data-act="none"]').onclick = () =>
+    list.querySelectorAll('input').forEach(c => c.checked = false);
+  node.querySelector('[data-act="apply"]').onclick = () => {
+    const on = [...list.querySelectorAll('input')].filter(c => c.checked).map(c => +c.value);
+    selectedProjects = on.length === PROJ.length ? null : new Set(on);
+    label();
+    pop.dataset.open = 'false'; btn.setAttribute('aria-expanded','false');
+    onChange();
+  };
+  return node;
+}
+
+/* Build a filter rail. `specs` describe the per-tab controls; the project
+   picker is always first so every dashboard shares one scoping control. */
+function buildRail(specs, state, onChange) {
+  const rail = el('<div class="rail"></div>');
+
+  /* Region sits beside the project picker because it scopes the whole page the
+     same way a project does, rather than being a per-tab attribute filter. */
+  const regionField = el(`<div class="field"><label for="f_region">Region</label>
+    <select id="f_region"><option value="">All regions</option></select></div>`);
+  const regionSel = regionField.querySelector('select');
+  const regionOpts = () => {
+    const present = new Set(D.projects.map((p, i) => regionOf(i) || 'Unassigned'));
+    return REGION_CHOICES.filter(r => present.has(r)).concat(present.has('Unassigned') ? ['Unassigned'] : []);
+  };
+  regionSel.onchange = () => { activeRegion = regionSel.value; onChange(); };
+  rail.appendChild(regionField);
+
+  const picker = projectPicker(onChange);
+  rail.appendChild(picker);
+  const controls = [];
+
+  specs.forEach(sp => {
+    const id = 'f_' + sp.key;
+    if (sp.type === 'search') {
+      const f = el(`<div class="field"><label for="${id}">${esc(sp.label)}</label>
+        <input type="search" id="${id}" placeholder="${esc(sp.placeholder || '')}"></div>`);
+      const inp = f.querySelector('input');
+      inp.value = state[sp.key] || '';
+      let t;
+      inp.oninput = () => { clearTimeout(t); t = setTimeout(() => { state[sp.key] = inp.value; onChange(); }, 180); };
+      controls.push({ key: sp.key, node: inp });
+      rail.appendChild(f);
+    } else {
+      const f = el(`<div class="field"><label for="${id}">${esc(sp.label)}</label>
+        <select id="${id}"><option value="">${esc(sp.anyLabel || 'Any')}</option></select></div>`);
+      const sel = f.querySelector('select');
+      sel.onchange = () => { state[sp.key] = sel.value; onChange(); };
+      controls.push({ key: sp.key, node: sel, spec: sp });
+      rail.appendChild(f);
+    }
+  });
+
+  rail.appendChild(el('<div class="spacer"></div>'));
+  const reset = el('<button class="btn btn-quiet">Reset filters</button>');
+  reset.onclick = () => {
+    selectedProjects = null;
+    activeRegion = '';
+    Object.keys(state).forEach(k => delete state[k]);
+    onChange();
+  };
+  rail.appendChild(reset);
+
+  /* Clicking a chart writes straight into `state`, so the controls have to be
+     pulled back into line afterwards or the rail would show stale values.
+     Select options are also rebuilt here rather than at mount, so each dropdown
+     only ever offers values that exist under the filters currently applied. A
+     cost code belonging to a project you have filtered out should not be
+     offered, and a selection that stops being valid is dropped rather than left
+     in place returning nothing. */
+  rail.sync = () => {
+    const rOpts = regionOpts();
+    const rExisting = [...regionSel.options].slice(1).map(o => o.value);
+    if (rExisting.length !== rOpts.length || rExisting.some((v, i) => v !== rOpts[i])) {
+      regionSel.innerHTML = '<option value="">All regions</option>'
+        + rOpts.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('');
+    }
+    if (activeRegion && !rOpts.includes(activeRegion)) activeRegion = '';
+    regionSel.value = activeRegion;
+
+    picker.sync();
+    controls.forEach(c => {
+      if (!c.spec) {                       // free text input
+        const v = state[c.key] || '';
+        if (c.node.value !== v) c.node.value = v;
+        return;
+      }
+      const opts = c.spec.options();
+      if (state[c.key] && !opts.includes(state[c.key])) delete state[c.key];
+      const existing = [...c.node.options].slice(1).map(o => o.value);
+      const changed = existing.length !== opts.length || existing.some((v, i) => v !== opts[i]);
+      if (changed) {
+        c.node.innerHTML = `<option value="">${esc(c.spec.anyLabel || 'Any')}</option>`
+          + opts.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+      }
+      c.node.value = state[c.key] || '';
+    });
+  };
+  rail.sync();
+  return rail;
+}
+
+/* Removable chips for whatever is currently narrowing the view, so a filter
+   applied by clicking a chart is visible and reversible in one action. */
+function activeChips(state, labels, onChange) {
+  const wrap = el('<div class="chips"></div>');
+  const add = (text, clear) => {
+    const c = el(`<span class="chip">${esc(text)}<button aria-label="Remove filter">&times;</button></span>`);
+    c.querySelector('button').onclick = () => { clear(); onChange(); };
+    wrap.appendChild(c);
+  };
+  if (activeRegion) add(`Region: ${activeRegion}`, () => { activeRegion = ''; });
+  if (selectedProjects !== null) {
+    add(selectedProjects.size === 1
+      ? `Project: ${PROJ[[...selectedProjects][0]]}`
+      : `Projects: ${selectedProjects.size} of ${PROJ.length}`,
+      () => { selectedProjects = null; });
+  }
+  Object.keys(state).forEach(k => {
+    if (!state[k]) return;
+    add(`${labels[k] || k}: ${state[k]}`, () => { delete state[k]; });
+  });
+  if (!wrap.children.length) return null;
+  const clearAll = el('<button class="btn btn-quiet">Clear all</button>');
+  clearAll.onclick = () => {
+    selectedProjects = null;
+    activeRegion = '';
+    Object.keys(state).forEach(k => delete state[k]);
+    onChange();
+  };
+  wrap.appendChild(clearAll);
+  return wrap;
+}
+
+// ---------------------------------------------------------------- charts
+/* SVG children must be built in the SVG namespace. Going through an HTML
+   <template> would silently produce unrendered HTML-namespace nodes, so the
+   whole chart is parsed as one SVG document and imported. */
+function svgNode(markup) {
+  const doc = new DOMParser().parseFromString(markup, 'image/svg+xml');
+  return document.importNode(doc.documentElement, true);
+}
+
+function barChart(rows, opts = {}) {
+  if (!rows.length) return el('<p class="empty">Nothing to plot for this selection.</p>');
+  // padR must fit the longest value label, which can be a full currency figure.
+  const W = 560, padL = opts.padL || 200, padT = 4;
+  const padR = Math.max(60, 8 + 7 * Math.max(...rows.map(r => nf(r.value).length)));
+
+  /* `slots` is the row count shared by both charts in a pair, so two charts
+     side by side occupy the same height instead of one towering over the other.
+     Bars grow to use the reserved space, up to a sane maximum, and the group is
+     centred so a short chart reads as deliberate rather than as a rendering gap. */
+  const slots = Math.max(rows.length, opts.slots || 0);
+  const gap = 9;
+  const bar = Math.min(34, Math.max(16, Math.round((slots * 29) / rows.length) - gap));
+  const H = padT * 2 + slots * 29;
+  const contentH = rows.length * (bar + gap);
+  const originY = padT + Math.max(0, (H - padT * 2 - contentH) / 2);
+  const max = Math.max(1, ...rows.map(r => Math.abs(r.value)));
+  const fill = opts.color || cvar('--s1');
+  // Label budget scales with the space actually reserved for labels.
+  const trunc = (s, n = Math.max(12, Math.floor(padL / 6.2))) =>
+    s.length > n ? s.slice(0, n - 1) + '…' : s;
+
+  const pickable = typeof opts.pick === 'function';
+
+  let parts = '';
+  rows.forEach((r, i) => {
+    const y = originY + i * (bar + gap);
+    const w = Math.max(2, (W - padL - padR) * (Math.abs(r.value) / max));
+    const hint = pickable ? `Filter by ${r.label}` : `${r.label}: ${nf(r.value)}`;
+    parts += `<g class="row">`
+          +  `<text x="${padL - 9}" y="${y + bar / 2 + 4}" text-anchor="end" class="tick rowlabel"`
+          +  ` fill="var(--ink-2)" font-size="12">${esc(trunc(r.label))}</text>`
+          +  `<rect class="bar" x="${padL}" y="${y}" width="${w}" height="${bar}" rx="3.5" fill="${fill}"></rect>`
+          +  `<text x="${padL + w + 7}" y="${y + bar / 2 + 4}" class="tick" font-size="12">${nf(r.value)}</text>`
+          +  `<rect class="hit" x="0" y="${y - gap / 2}" width="${W}" height="${bar + gap}"`
+          +  ` data-i="${i}"${pickable ? ' tabindex="0" role="button"' : ''}`
+          +  ` aria-label="${esc(hint)}"></rect>`
+          +  `</g>`;
+  });
+
+  const svg = svgNode(`<svg xmlns="http://www.w3.org/2000/svg" class="chart"
+    width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="${pickable ? 'group' : 'img'}"
+    aria-label="${esc(opts.aria || 'Bar chart')}">${parts}</svg>`);
+
+  svg.querySelectorAll('rect.hit').forEach(hit => {
+    const r = rows[+hit.getAttribute('data-i')];
+    const tipHtml = `<strong>${esc(r.label)}</strong><br>${nf(r.value)}`
+      + (r.note ? '<br>' + esc(r.note) : '')
+      + (pickable ? '<br><em>Click to filter</em>' : '');
+    hit.addEventListener('mousemove', e => tipShow(e, tipHtml));
+    hit.addEventListener('mouseleave', tipHide);
+    if (!pickable) return;
+    hit.addEventListener('click', () => { tipHide(); opts.pick(r); });
+    hit.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tipHide(); opts.pick(r); }
+    });
+  });
+  return svg;
+}
+
+function lineChart(series, months, opts = {}) {
+  if (!months.length) return el('<p class="empty">Nothing to plot for this selection.</p>');
+  const W = 820, H = 230, padL = 52, padR = 14, padT = 10, padB = 26;
+  const pw = W - padL - padR, ph = H - padT - padB;
+  const max = Math.max(1, ...series.flatMap(s => s.values));
+  const X = i => padL + (months.length > 1 ? (pw / (months.length - 1)) * i : 0);
+  const Y = v => padT + ph - (v / max) * ph;
+
+  let parts = '';
+  for (let g = 0; g <= 4; g++) {
+    const y = padT + ph * g / 4;
+    parts += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" class="grid"></line>`
+          +  `<text x="${padL - 8}" y="${y + 3.5}" text-anchor="end" class="tick">${nf(Math.round(max * (1 - g / 4)))}</text>`;
+  }
+  const every = Math.max(1, Math.ceil(months.length / 9));
+  months.forEach((m, i) => {
+    if (i % every === 0 || i === months.length - 1) {
+      parts += `<text x="${X(i)}" y="${H - 7}" text-anchor="middle" class="tick">${esc(m)}</text>`;
+    }
+  });
+  const pickable = typeof opts.pick === 'function';
+
+  series.forEach((s, si) => {
+    const c = cvar(SERIES[si % SERIES.length]);
+    parts += `<polyline points="${s.values.map((v, i) => `${X(i)},${Y(v)}`).join(' ')}" fill="none"`
+          +  ` stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>`;
+  });
+  // Hit targets are drawn last so they sit above every line, and are far larger
+  // than the 3.6px marker they belong to.
+  series.forEach((s, si) => {
+    const c = cvar(SERIES[si % SERIES.length]);
+    s.values.forEach((v, i) => {
+      parts += `<circle class="pt-hit" cx="${X(i)}" cy="${Y(v)}" r="11" data-s="${si}" data-i="${i}"`
+            +  `${pickable ? ' tabindex="0" role="button"' : ''}`
+            +  ` aria-label="${esc(`${s.label}, ${months[i]}, ${nf(v)}${pickable ? '. Filter to this month' : ''}`)}"></circle>`
+            +  `<circle class="pt" cx="${X(i)}" cy="${Y(v)}" r="3.6" fill="${c}" pointer-events="none"></circle>`;
+    });
+  });
+
+  const svg = svgNode(`<svg xmlns="http://www.w3.org/2000/svg" class="chart"
+    width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="${pickable ? 'group' : 'img'}"
+    aria-label="${esc(opts.aria || 'Trend chart')}">${parts}</svg>`);
+
+  svg.querySelectorAll('circle.pt-hit').forEach(dot => {
+    const s = series[+dot.getAttribute('data-s')], i = +dot.getAttribute('data-i');
+    const tipHtml = `<strong>${esc(s.label)}</strong><br>${esc(months[i])}: ${nf(s.values[i])}`
+      + (pickable ? '<br><em>Click to filter to this month</em>' : '');
+    dot.addEventListener('mousemove', e => tipShow(e, tipHtml));
+    dot.addEventListener('mouseleave', tipHide);
+    if (!pickable) return;
+    dot.addEventListener('click', () => { tipHide(); opts.pick(months[i]); });
+    dot.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tipHide(); opts.pick(months[i]); }
+    });
+  });
+  return svg;
+}
+
+const keyRow = series => el(`<div class="key">${series.map((s, i) =>
+  `<span><i style="background:${cvar(SERIES[i % SERIES.length])}"></i>${esc(s.label)}</span>`).join('')}</div>`);
+
+/* ------------------------------------------------------- Excel (.xlsx) export
+   Written by hand because the artifact CSP blocks external libraries. A real
+   workbook is worth the effort over CSV: cell types are declared, so Excel will
+   not reinterpret a cost code like 3000-3100-3110-3111 or strip leading zeros
+   from a part number. Entries are STORED (uncompressed), which keeps the zip
+   writer to a CRC and a couple of headers. */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function zipStore(files) {
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  files.forEach(f => {
+    const name = enc.encode(f.name);
+    const data = enc.encode(f.text);
+    const crc = crc32(data), size = data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true);
+    lh.setUint16(8, 0, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, size, true); lh.setUint32(22, size, true);
+    lh.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(lh.buffer), name, data);
+
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true);
+    ch.setUint16(10, 0, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, size, true); ch.setUint32(24, size, true);
+    ch.setUint16(28, name.length, true); ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30 + name.length + size;
+  });
+  const centralBytes = central.reduce((a, b) => a + b.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);
+  end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, centralBytes, true); end.setUint32(16, offset, true);
+  const all = [...parts, ...central, new Uint8Array(end.buffer)];
+  const out = new Uint8Array(all.reduce((a, b) => a + b.length, 0));
+  let p = 0;
+  all.forEach(b => { out.set(b, p); p += b.length; });
+  return out;
+}
+
+const xesc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+                           .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+const colRef = n => { let s = ''; n++; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+
+function exportXlsx(cols, rows, filename, sheetName) {
+  const nCols = cols.length, nRows = rows.length;
+  let sd = `<row r="1">` + cols.map((c, i) =>
+    `<c r="${colRef(i)}1" t="inlineStr" s="1"><is><t xml:space="preserve">${xesc(c.label)}</t></is></c>`).join('') + `</row>`;
+  rows.forEach((r, ri) => {
+    let cells = '';
+    cols.forEach((c, i) => {
+      const v = c.value(r);
+      const ref = `${colRef(i)}${ri + 2}`;
+      if (typeof v === 'number' && isFinite(v)) cells += `<c r="${ref}"><v>${v}</v></c>`;
+      else {
+        const s = v == null ? '' : String(v);
+        if (s) cells += `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xesc(s)}</t></is></c>`;
+      }
+    });
+    sd += `<row r="${ri + 2}">${cells}</row>`;
+  });
+
+  const lastCol = colRef(nCols - 1);
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`
+    + `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`
+    + `<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
+    + `<cols>` + cols.map((c, i) =>
+        `<col min="${i + 1}" max="${i + 1}" width="${c.num ? 14 : 30}" customWidth="1"/>`).join('') + `</cols>`
+    + `<sheetData>${sd}</sheetData>`
+    + `<autoFilter ref="A1:${lastCol}${Math.max(1, nRows + 1)}"/>`
+    + `</worksheet>`;
+
+  const files = [
+    { name: '[Content_Types].xml', text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
+    { name: '_rels/.rels', text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+    { name: 'xl/workbook.xml', text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xesc((sheetName || 'Data').slice(0, 31))}" sheetId="1" r:id="rId1"/></sheets></workbook>` },
+    { name: 'xl/_rels/workbook.xml.rels', text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+    { name: 'xl/styles.xml', text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>` },
+    { name: 'xl/worksheets/sheet1.xml', text: sheet },
+  ];
+
+  return zipStore(files);
+}
+
+function buildCsv(cols, rows) {
+  const q = v => { const s = v == null ? '' : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const lines = [cols.map(c => q(c.label)).join(',')];
+  rows.forEach(r => lines.push(cols.map(c => q(c.value(r))).join(',')));
+  return '\ufeff' + lines.join('\r\n');   // BOM so Excel decodes UTF-8
+}
+
+/* Local file: a real .xlsx via an anchor, as before. Hosted artifact: the viewer
+   sandbox blocks anchor downloads, so the save goes through the viewer's own
+   confirmation via the downloads capability. Its allowlist has no xlsx, so the
+   hosted path degrades xlsx -> csv -> txt, whichever the view accepts. */
+async function saveTable(cols, rows, filename, sheetName) {
+  const hosted = typeof window.claude !== 'undefined' && window.claude && typeof window.claude.use === 'function';
+  if (!hosted) {
+    const blob = new Blob([exportXlsx(cols, rows, filename, sheetName)],
+      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    return { status: 'saved', format: 'xlsx' };
+  }
+  const downloads = await window.claude.use('downloads');
+  if (!downloads) return { status: 'unavailable' };
+  const attempts = [
+    { filename, data: () => exportXlsx(cols, rows, filename, sheetName), format: 'xlsx' },
+    { filename: filename.replace(/\.xlsx$/, '.csv'), data: () => buildCsv(cols, rows), format: 'csv' },
+    { filename: filename.replace(/\.xlsx$/, '.txt'), data: () => buildCsv(cols, rows), format: 'txt' },
+  ];
+  let last;
+  for (const t of attempts) {
+    try {
+      await downloads.save({ filename: t.filename, data: t.data() });
+      return { status: 'saved', format: t.format };
+    } catch (err) {
+      last = err;
+      if (err && (err.code === 'rejected_extension' || err.code === 'extension_not_enabled')) continue;
+      return { status: err && err.code === 'declined' ? 'declined'
+             : err && err.code === 'rate_limited' ? 'rate_limited' : 'error', err };
+    }
+  }
+  return { status: 'error', err: last };
+}
+
+// A filename that records what the export was actually filtered to.
+function exportName(base) {
+  const bits = [base];
+  if (activeRegion) bits.push(activeRegion);
+  if (selectedProjects && selectedProjects.size === 1) {
+    bits.push(PROJ[[...selectedProjects][0]].replace(/^Procore:\s*/, '').replace(/[^A-Za-z0-9]+/g, '-').slice(0, 28));
+  } else if (selectedProjects) bits.push(`${selectedProjects.size}-projects`);
+  const d = new Date(D.generated_at);
+  bits.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  return bits.join('_').replace(/_+/g, '_') + '.xlsx';
+}
+
+// ---------------------------------------------------------------- data table
+function dataTable(cols, rows, opts = {}) {
+  const size = opts.pageSize || 50;
+  let page = 0;
+  let sortAt = opts.sortAt ?? null, dir = opts.sortDir ?? -1;
+  // One free-text filter per column, entered straight into that column's own
+  // heading - "filterable headings" - on top of whatever the sidebar rail
+  // already narrowed. Blank for every column until the user types into one.
+  const filterable = opts.filterable !== false;
+  const colFilters = cols.map(() => '');
+  const colGet = c => r => c.filterVal ? c.filterVal(r) : (c.sortVal ? c.sortVal(r) : c.value(r));
+  // Each heading's dropdown lists every distinct value this column holds across
+  // the rows handed to this table, so "filterable heading" means pick-from-list
+  // rather than type-to-search - except for a column like Material, with tens
+  // of thousands of distinct names. A <select> that long is not a dropdown
+  // anyone can use and is heavy enough to slow the table down on every repaint,
+  // so a column over this cardinality keeps the type-to-search box instead.
+  const MAX_DROPDOWN_OPTIONS = 500;
+  const colOptions = cols.map(c => {
+    const get = colGet(c);
+    const vals = [...new Set(rows.map(get).filter(v => v !== '' && v != null))];
+    vals.sort((a, b) => c.num ? (a - b) : String(a).localeCompare(String(b)));
+    return vals;
+  });
+  // Numeric columns (quantities, values) are excluded even when the distinct
+  // count is small - "pick the exact quantity from a list" is not a filter
+  // anyone wants; a search box that matches on the displayed number is more
+  // useful there.
+  const colIsDropdown = cols.map((c, i) => !c.num && colOptions[i].length > 0 && colOptions[i].length <= MAX_DROPDOWN_OPTIONS);
+  let filtered = rows, view = rows;
+
+  function applyFilters() {
+    filtered = colFilters.some(Boolean)
+      ? rows.filter(r => cols.every((c, i) => {
+          const f = colFilters[i];
+          if (!f) return true;
+          const v = String(colGet(c)(r) ?? '');
+          return colIsDropdown[i] ? v === f : v.toLowerCase().includes(f);
+        }))
+      : rows;
+    view = filtered;
+  }
+
+  const wrap = el(`<div class="tablewrap"><div class="tablescroll"></div>
+    <div class="tfoot"><span class="count"></span>
+    <span class="pages"><button class="btn btn-export" data-p="xlsx" title="Export every filtered row, not just this page">Export to Excel</button>
+    <button class="btn" data-p="first">First</button>
+    <button class="btn" data-p="prev">Prev</button><span class="at"></span>
+    <button class="btn" data-p="next">Next</button></span></div></div>`);
+  const scroll = wrap.querySelector('.tablescroll');
+
+  /* Exports the whole filtered and sorted set, which is almost always what is
+     wanted, rather than the fifty rows currently on screen. */
+  wrap.querySelector('[data-p="xlsx"]').onclick = async () => {
+    const btn = wrap.querySelector('[data-p="xlsx"]');
+    const was = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Preparing...';
+    try {
+      const r = await saveTable(cols, view, exportName(opts.exportName || 'SiteSense'), opts.exportName || 'Data');
+      btn.textContent = r.status === 'saved' ? `Exported ${nf(view.length)} rows${r.format !== 'xlsx' ? ' (' + r.format + ')' : ''}`
+        : r.status === 'declined' ? 'Cancelled'
+        : r.status === 'rate_limited' ? 'Busy, try again shortly'
+        : r.status === 'unavailable' ? 'Saving unavailable here'
+        : 'Export failed';
+      if (r.status === 'error') console.error('export failed', r.err);
+    } catch (err) { btn.textContent = 'Export failed'; console.error('export failed', err); }
+    setTimeout(() => { btn.textContent = was; btn.disabled = false; }, 2400);
+  };
+
+  function sort() {
+    if (sortAt === null) { view = filtered; return; }
+    const c = cols[sortAt];
+    view = filtered.slice().sort((a, b) => {
+      const x = c.sortVal ? c.sortVal(a) : c.value(a), y = c.sortVal ? c.sortVal(b) : c.value(b);
+      return (typeof x === 'number' && typeof y === 'number')
+        ? (x - y) * dir : String(x).localeCompare(String(y)) * dir;
+    });
+  }
+
+  function paint() {
+    // Column filter controls get rebuilt along with everything else below, so
+    // a repaint triggered by picking one would otherwise drop keyboard focus
+    // (and, for the text-search fallback, the caret position mid-keystroke).
+    const wasFocused = scroll.querySelector('.th-filter:focus');
+    const focusedAt = wasFocused ? +wasFocused.dataset.i : null;
+    const caret = wasFocused && wasFocused.tagName === 'INPUT' ? wasFocused.selectionStart : null;
+
+    const pages = Math.max(1, Math.ceil(view.length / size));
+    page = Math.min(page, pages - 1);
+    const slice = view.slice(page * size, page * size + size);
+    scroll.innerHTML = `<table>
+      <thead><tr>${cols.map((c, i) => `<th class="${c.num ? 'num' : ''}">
+        <div class="th-label" data-i="${i}" title="Sort by ${esc(c.label)}">${esc(c.label)}${sortAt === i ? ` <span class="dir">${dir === 1 ? '↑' : '↓'}</span>` : ''}</div>
+        ${!filterable ? '' : colIsDropdown[i] ? `<select class="th-filter" data-i="${i}">
+          <option value="">${esc(c.label)} (all)</option>
+          ${colOptions[i].map(v => `<option value="${esc(String(v))}"${colFilters[i] === String(v) ? ' selected' : ''}>${esc(String(v))}</option>`).join('')}
+        </select>` : `<input class="th-filter" type="search" data-i="${i}" placeholder="Search…" value="${esc(colFilters[i])}">`}
+      </th>`).join('')}</tr></thead>
+      <tbody>${slice.length ? slice.map(r => `<tr>${cols.map(c =>
+        `<td class="${c.num ? 'num' : ''}">${c.cell ? c.cell(r) : esc(c.value(r))}</td>`).join('')}</tr>`).join('')
+        : `<tr><td colspan="${cols.length}" class="empty">No rows match these filters.</td></tr>`}</tbody>
+      </table>`;
+
+    wrap.querySelector('.count').textContent =
+      `${nf(view.length)} row${view.length === 1 ? '' : 's'}`;
+    wrap.querySelector('.at').textContent = `Page ${page + 1} of ${pages}`;
+    wrap.querySelector('[data-p="first"]').disabled = page === 0;
+    wrap.querySelector('[data-p="prev"]').disabled = page === 0;
+    wrap.querySelector('[data-p="next"]').disabled = page >= pages - 1;
+
+    scroll.querySelectorAll('.th-label').forEach(lbl => lbl.onclick = () => {
+      const i = +lbl.dataset.i;
+      if (sortAt === i) dir *= -1; else { sortAt = i; dir = -1; }
+      sort(); page = 0; paint();
+    });
+    scroll.querySelectorAll('select.th-filter').forEach(sel => {
+      sel.onchange = () => {
+        colFilters[+sel.dataset.i] = sel.value;
+        applyFilters(); sort(); page = 0; paint();
+      };
+      sel.onclick = e => e.stopPropagation();
+    });
+    scroll.querySelectorAll('input.th-filter').forEach(inp => {
+      let t;
+      inp.oninput = () => {
+        clearTimeout(t);
+        t = setTimeout(() => {
+          colFilters[+inp.dataset.i] = inp.value.trim().toLowerCase();
+          applyFilters(); sort(); page = 0; paint();
+        }, 180);
+      };
+      inp.onclick = e => e.stopPropagation();
+    });
+
+    if (focusedAt !== null) {
+      const sel = scroll.querySelector(`.th-filter[data-i="${focusedAt}"]`);
+      if (sel && sel.tagName === 'INPUT' && caret !== null) { sel.focus(); sel.setSelectionRange(caret, caret); }
+      else if (sel) sel.focus();
+    }
+    // Cells with their own interactive controls (an editable select or date
+    // input) need rebinding after every repaint, not just the first one -
+    // sorting, paging or filtering a column all rebuild these cells same as
+    // any other. Callers with such cells hook in here instead of binding once
+    // from outside, which would go stale the moment the table repaints itself.
+    if (opts.onRepaint) opts.onRepaint(scroll);
+  }
+
+  wrap.querySelector('[data-p="first"]').onclick = () => { page = 0; paint(); };
+  wrap.querySelector('[data-p="prev"]').onclick = () => { page--; paint(); };
+  wrap.querySelector('[data-p="next"]').onclick = () => { page++; paint(); };
+
+  applyFilters(); sort(); paint();
+  return wrap;
+}
+
+function strip(items) {
+  return el(`<dl class="strip">${items.map(i =>
+    `<div><dt>${esc(i.label)}</dt><dd class="${i.flag ? 'flag-alert' : ''}">${i.value}${i.unit ? `<small>${esc(i.unit)}</small>` : ''}</dd></div>`).join('')}</dl>`);
+}
+
+function block(title, hint, ...children) {
+  const b = el(`<section class="block"><h3>${esc(title)}</h3>${hint ? `<p class="hint">${esc(hint)}</p>` : ''}</section>`);
+  children.filter(Boolean).forEach(c => b.appendChild(c));
+  return b;
+}
+
+/* Two bar charts sharing one row. Both are given the same number of row slots so
+   they finish at the same height, which is what keeps the pair looking balanced
+   when one has ten bars and the other has two. */
+function chartPair(a, b) {
+  const slots = Math.max(a.rows.length, b.rows.length);
+  const cols = el('<div class="split"></div>');
+  cols.appendChild(block(a.title, a.hint, barChart(a.rows, { ...a.opts, slots })));
+  cols.appendChild(block(b.title, b.hint, barChart(b.rows, { ...b.opts, slots })));
+  return cols;
+}
+
+const uniqSorted = vals => [...new Set(vals.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+/* Clicking a project bar scopes to that project alone. Clicking the same bar
+   again when it is already the only project restores the full portfolio, so a
+   chart click is always reversible from the chart itself. */
+function pickProject(name) {
+  const i = PROJ.indexOf(name);
+  if (i < 0) return;
+  selectedProjects = (selectedProjects && selectedProjects.size === 1 && selectedProjects.has(i))
+    ? null : new Set([i]);
+}
+// Same toggle behaviour for the plain string filters.
+const pickValue = (state, key, value) => {
+  state[key] = state[key] === value ? '' : value;
+};
+
+// ================================================================ TAB: Overview (front page)
+/* Rolls the five domains up per project, then to region. Everything headline is
+   a count of documents, lines or parts, all of which add up cleanly. Value is
+   carried as a secondary figure only, because it depends on unit costs that are
+   not uniformly reliable (see the Asset Tracking tab). */
+function overviewByProject() {
+  const rows = PROJ.map((name, i) => ({
+    i, name, region: regionOf(i) || 'Unassigned',
+    po: 0, receipts: 0, transfers: 0, inventory: 0, assets: 0,
+    receiptLines: 0, receivedValue: 0, outstanding: 0,
+  }));
+  const bump = (key, docs) => (docs || []).forEach(d => { if (inScope(d[0])) rows[d[0]][key]++; });
+  bump('po', (D.ledger_types.purchase_orders || {}).docs);
+  bump('receipts', (D.ledger_types.receipts || {}).docs);
+  bump('transfers', (D.ledger_types.transfer_notes || {}).docs);
+
+  (D.inventory || []).forEach(r => { if (inScope(r[0])) rows[r[0]].inventory++; });
+  (D.assets || []).forEach(r => {
+    if (!inScope(r[0])) return;
+    rows[r[0]].assets++;
+    if (r[A.ORD] - r[A.RCV] > 0) rows[r[0]].outstanding++;
+  });
+  (D.receipts || []).forEach(r => {
+    if (!inScope(r[0])) return;
+    rows[r[0]].receiptLines++;
+    rows[r[0]].receivedValue += r[R.QTY] * (r[R.UC] || 0);
+  });
+  return rows.filter(r => inScope(r.i));
+}
+
+function tabOverview(stage) {
+  const rail = buildRail([], {}, () => render());
+  stage.appendChild(rail);
+  const host = el('<div></div>');
+  stage.appendChild(host);
+
+  function render() {
+    rail.sync();
+    const per = overviewByProject();
+    host.textContent = '';
+
+    const chips = activeChips({}, {}, render);
+    if (chips) host.appendChild(chips);
+
+    if (!per.length) {
+      host.appendChild(el('<p class="notice">No projects match the current scope.</p>'));
+      return;
+    }
+
+    const sum = k => per.reduce((a, r) => a + r[k], 0);
+    host.appendChild(strip([
+      { label: 'Purchase orders', value: nf(sum('po')) },
+      { label: 'Receipts', value: nf(sum('receipts')) },
+      { label: 'Transfers', value: nf(sum('transfers')) },
+      { label: 'Inventory lines', value: nf(sum('inventory')) },
+      { label: 'Parts tracked', value: nf(sum('assets')) },
+      { label: 'Parts outstanding', value: nf(sum('outstanding')), flag: sum('outstanding') > 0 },
+      { label: 'Received value', value: '$' + nf(Math.round(sum('receivedValue'))) },
+      { label: 'Active projects', value: nf(per.filter(r => r.po || r.receipts || r.transfers || r.inventory).length) },
+    ]));
+
+    // ---- by region ----
+    const regions = {};
+    per.forEach(r => {
+      const g = regions[r.region] || (regions[r.region] =
+        { region: r.region, projects: 0, po: 0, receipts: 0, transfers: 0, inventory: 0, assets: 0, outstanding: 0, receivedValue: 0 });
+      g.projects++;
+      ['po', 'receipts', 'transfers', 'inventory', 'assets', 'outstanding', 'receivedValue']
+        .forEach(k => { g[k] += r[k]; });
+    });
+    const regionRows = Object.values(regions).sort((a, b) => b.po + b.receipts - (a.po + a.receipts));
+
+    const docsByRegion = regionRows.map(g => ({
+      label: g.region, value: g.po + g.receipts + g.transfers,
+      note: `${nf(g.projects)} projects`,
+    }));
+    const docsByProject = per.map(r => ({
+      label: r.name.replace(/^Procore:\s*/, ''),
+      value: r.po + r.receipts + r.transfers,
+      note: `${r.region}\n${nf(r.inventory)} inventory lines`,
+    })).filter(x => x.value > 0).sort((a, b) => b.value - a.value).slice(0, 9);
+
+    host.appendChild(chartPair(
+      { title: 'Documents by region', hint: 'Purchase orders, receipts and transfers combined. Click a bar to filter.',
+        rows: docsByRegion,
+        opts: { padL: 130, aria: 'Documents by region',
+                pick: r => { activeRegion = activeRegion === r.label ? '' : r.label; render(); } } },
+      { title: 'Busiest projects', hint: 'By document volume. Click a bar to filter.',
+        rows: docsByProject,
+        opts: { color: cvar('--s3'), padL: 210, aria: 'Documents by project',
+                pick: r => { const full = PROJ.find(p => p.replace(/^Procore:\s*/, '') === r.label);
+                             if (full) pickProject(full); render(); } } }));
+
+    const numCol = (label, key, flag) => ({
+      label, value: r => r[key], num: true,
+      cell: r => r[key] ? (flag && r[key] ? `<span class="short">${nf(r[key])}</span>` : nf(r[key]))
+                        : '<span class="zero">0</span>',
+    });
+
+    host.appendChild(block('By region', 'Click a region to scope the whole dashboard to it.',
+      dataTable([
+        { label: 'Region', value: r => r.region,
+          cell: r => `<span class="dot ${r.region === 'East' ? 'dot-ok' : r.region === 'West' ? 'dot-warn' : ''}">${esc(r.region)}</span>` },
+        numCol('Projects', 'projects'),
+        numCol('Purchase orders', 'po'),
+        numCol('Receipts', 'receipts'),
+        numCol('Transfers', 'transfers'),
+        numCol('Inventory lines', 'inventory'),
+        numCol('Parts tracked', 'assets'),
+        numCol('Parts outstanding', 'outstanding', true),
+        { label: 'Received value', value: r => Math.round(r.receivedValue), num: true,
+          cell: r => '$' + nf(Math.round(r.receivedValue)) },
+      ], regionRows, { sortAt: 2, pageSize: 10, exportName: 'Overview_by_Region' })));
+
+    host.appendChild(block('By project', 'Every project across all five domains.',
+      dataTable([
+        { label: 'Project', value: r => r.name,
+          cell: r => `<span class="clip clip-wide" title="${esc(r.name)}">${esc(r.name)}</span>` },
+        { label: 'Region', value: r => r.region },
+        numCol('Purchase orders', 'po'),
+        numCol('Receipts', 'receipts'),
+        numCol('Transfers', 'transfers'),
+        numCol('Inventory lines', 'inventory'),
+        numCol('Parts tracked', 'assets'),
+        numCol('Parts outstanding', 'outstanding', true),
+        { label: 'Received value', value: r => Math.round(r.receivedValue), num: true,
+          cell: r => r.receivedValue ? '$' + nf(Math.round(r.receivedValue)) : '<span class="zero">0</span>' },
+      ], per, { sortAt: 2, pageSize: 40, exportName: 'Overview_by_Project' })));
+
+    host.appendChild(el(`<p class="notice">Counts are documents, stock lines and parts, which add up
+      across projects. Received value is the only money figure here and depends on purchase order unit
+      costs, some of which are unreliable in the source data. The Asset Tracking tab explains where.</p>`));
+  }
+  render();
+}
+
+// ================================================================ TAB: Inventory
+// inventory row: [p, m, required, ordered, received, issued, available, onHand, ship, hold, damage, scrap, return]
+const INV = { R: 2, O: 3, RC: 4, IS: 5, AV: 6, OH: 7, HOLD: 9, DMG: 10, PO: 13, PODESC: 14, ESTD: 15 };
+
+// SiteSense's Orders page renders timestamps as the browser's local calendar
+// date, so a PO created at 22:02 UTC shows as the next day here. Same rule.
+function localDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return iso.slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+const invState = {};
+
+const STOCK_TESTS = {
+  'In stock': r => r[INV.AV] > 0,
+  'Nothing available': r => !(r[INV.AV] > 0),
+  'Awaiting receipt': r => r[INV.O] - r[INV.RC] > 0,
+  'Held or damaged': r => r[INV.HOLD] > 0 || r[INV.DMG] > 0,
+};
+
+function tabInventory(stage) {
+  const st = invState;
+
+  // Location and Checked By are not Inventory fields at all - they come off
+  // the most recent Receipt against the same project + material, matching
+  // where it was put away and who receipted it the way the Receipt Dashboard
+  // records them. receipt row: [p, m, receipt, docStatus, cond, loc, checkedBy, ...]
+  const latestReceiptByPM = {};
+  (D.receipts || []).forEach(r => {
+    const key = r[0] + '_' + r[1];
+    const date = S(r[13]);
+    const cur = latestReceiptByPM[key];
+    if (!cur || date > cur.date) latestReceiptByPM[key] = { date, loc: S(r[5]), by: S(r[6]) };
+  });
+  const receivedLoc = (p, m) => (latestReceiptByPM[p + '_' + m] || {}).loc || '';
+  const receivedBy  = (p, m) => (latestReceiptByPM[p + '_' + m] || {}).by || '';
+
+  const passes = (r, skip) => {
+    if (!inScope(r[0])) return false;
+    if (skip !== 'type' && st.type && matType(r[1]) !== st.type) return false;
+    if (skip !== 'uom' && st.uom && matUom(r[1]) !== st.uom) return false;
+    if (skip !== 'q') {
+      const q = (st.q || '').toLowerCase();
+      if (q && !(matName(r[1]).toLowerCase().includes(q) || matDesc(r[1]).toLowerCase().includes(q))) return false;
+    }
+    if (skip !== 'stock' && st.stock && STOCK_TESTS[st.stock] && !STOCK_TESTS[st.stock](r)) return false;
+    return true;
+  };
+  const optsFor = (key, get) => uniqSorted(D.inventory.filter(r => passes(r, key)).map(get));
+
+  const rail = buildRail([
+    { key: 'q', type: 'search', label: 'Material', placeholder: 'Name or description' },
+    { key: 'type', type: 'select', label: 'Material type', anyLabel: 'All types',
+      options: () => optsFor('type', r => matType(r[1])) },
+    { key: 'uom', type: 'select', label: 'Unit', anyLabel: 'All units',
+      options: () => optsFor('uom', r => matUom(r[1])) },
+    { key: 'stock', type: 'select', label: 'Stock state', anyLabel: 'Any state',
+      options: () => {
+        const base = D.inventory.filter(r => passes(r, 'stock'));
+        return Object.keys(STOCK_TESTS).filter(k => base.some(STOCK_TESTS[k]));
+      } },
+  ], st, () => render());
+  stage.appendChild(rail);
+  const host = el('<div></div>');
+  stage.appendChild(host);
+
+  const LABELS = { q: 'Material', type: 'Type', uom: 'Unit', stock: 'Stock state' };
+
+  function render() {
+    rail.sync();
+    const rows = D.inventory.filter(r => passes(r));
+
+    host.textContent = '';
+    const chips = activeChips(invState, LABELS, render);
+    if (chips) host.appendChild(chips);
+    if (!rows.length) { host.appendChild(el('<p class="notice">No inventory matches these filters.</p>')); return; }
+
+    /* Counts, not quantity sums. Quantities across rows mix units of measure
+       (each, metres, days, lump sum) so a portfolio-wide quantity total is not
+       a real number. Per-row quantities in the table below are single-unit and
+       therefore sound. */
+    const nWith = rows.filter(r => r[INV.AV] > 0).length;
+    const nNone = rows.length - nWith;
+    const nAwait = rows.filter(r => r[INV.O] - r[INV.RC] > 0).length;
+    const nFlag = rows.filter(r => r[INV.HOLD] > 0 || r[INV.DMG] > 0).length;
+    // Material records are project scoped in SiteSense, so one stock line is one
+    // material. A separate "distinct materials" count would just repeat the total.
+    host.appendChild(strip([
+      { label: 'Stock lines', value: nf(rows.length) },
+      { label: 'Projects', value: nf(new Set(rows.map(r => r[0])).size) },
+      { label: 'Stock available', value: nf(nWith) },
+      { label: 'Nothing available', value: nf(nNone) },
+      { label: 'Awaiting receipt', value: nf(nAwait), flag: nAwait > 0 },
+      { label: 'Held or damaged', value: nf(nFlag), flag: nFlag > 0 },
+    ]));
+    host.appendChild(el(`<details class="notice" style="margin-bottom:22px">
+      <summary><strong>Why these are counts, not quantities</strong></summary>
+      <div>Quantities mix units of measure across materials, so a portfolio-wide quantity total
+      would not be a real number. Quantities are shown per row in the table below, where a single
+      unit applies.</div></details>`));
+
+    const dlBar = el('<div class="rail" style="margin-bottom:14px"></div>');
+    dlBar.appendChild(el(`<span class="hint" style="align-self:center; margin:0">
+      Estimated Delivery Date follows the PO created date (as SiteSense's Orders page shows it) unless
+      overridden here; Promised Delivery Date is entered here only - see the notice below the table.</span>`));
+    dlBar.appendChild(el('<div class="spacer"></div>'));
+    const dl = el('<button class="btn btn-quiet">Download delivery_dates.json</button>');
+    dl.onclick = async () => {
+      const text = JSON.stringify(deliveryDates, null, 2);
+      const hosted = typeof window.claude !== 'undefined' && window.claude && typeof window.claude.use === 'function';
+      const was = dl.textContent;
+      if (hosted) {
+        const downloads = await window.claude.use('downloads');
+        if (!downloads) { dl.textContent = 'Saving unavailable here'; }
+        else {
+          try { await downloads.save({ filename: 'delivery_dates.json', data: text }); dl.textContent = 'Saved'; }
+          catch (err) { dl.textContent = err && err.code === 'declined' ? 'Cancelled' : 'Save failed'; }
+        }
+        setTimeout(() => { dl.textContent = was; }, 2400);
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      a.download = 'delivery_dates.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    dlBar.appendChild(dl);
+    host.appendChild(dlBar);
+
+    const byType = {}, byProject = {};
+    rows.forEach(r => {
+      const t = matType(r[1]) || '(untyped)';
+      byType[t] = (byType[t] || 0) + 1;
+      byProject[PROJ[r[0]]] = (byProject[PROJ[r[0]]] || 0) + 1;
+    });
+    const top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n)
+      .map(([label, value]) => ({ label, value }));
+
+    host.appendChild(chartPair(
+      { title: 'Stock lines by project', hint: 'Number of material records held, not quantity. Click a bar to filter.',
+        rows: top(byProject, 9),
+        opts: { aria: 'Stock lines by project', pick: r => { pickProject(r.label); render(); } } },
+      { title: 'Stock lines by material type', hint: 'Click a bar to filter.',
+        rows: top(byType, 9),
+        opts: { color: cvar('--s3'), padL: 150, aria: 'Stock lines by material type',
+                pick: r => { pickValue(invState, 'type', r.label); render(); } } }));
+
+    const stockDot = r => {
+      if (r[INV.AV] > 0) return `<span class="dot dot-ok">${nf(r[INV.AV])}</span>`;
+      if (r[INV.O] - r[INV.RC] > 0) return `<span class="dot dot-warn">${nf(r[INV.AV])}</span>`;
+      return `<span class="dot">${nf(r[INV.AV])}</span>`;
+    };
+
+    host.appendChild(block('Stock by material', 'One row per material per project, matching the SiteSense Inventory report.',
+      dataTable([
+        { label: 'Material', value: r => matName(r[1]),
+          cell: r => `<span class="clip" title="${esc(matName(r[1]))}">${esc(matName(r[1]))}</span>` +
+                     (matDesc(r[1]) ? `<span class="sub clip clip-wide" title="${esc(matDesc(r[1]))}">${esc(matDesc(r[1]))}</span>` : '') },
+        { label: 'PO number', value: r => S(r[INV.PO]),
+          cell: r => S(r[INV.PO]) ? `<span class="clip" title="${esc(S(r[INV.PO]))}">${esc(S(r[INV.PO]))}</span>` : '<span class="zero">not linked</span>' },
+        { label: 'PO description', value: r => S(r[INV.PODESC]),
+          cell: r => `<span class="clip clip-wide" title="${esc(S(r[INV.PODESC]))}">${esc(S(r[INV.PODESC]) || '—')}</span>` },
+        { label: 'UOM', value: r => matUom(r[1]) },
+        { label: 'Required', value: r => r[INV.R], num: true, cell: r => r[INV.R] ? nf(r[INV.R]) : '<span class="zero">0</span>' },
+        { label: 'Ordered', value: r => r[INV.O], num: true, cell: r => r[INV.O] ? nf(r[INV.O]) : '<span class="zero">0</span>' },
+        { label: 'Received', value: r => r[INV.RC], num: true, cell: r => r[INV.RC] ? nf(r[INV.RC]) : '<span class="zero">0</span>' },
+        { label: 'Pending to come', value: r => r[INV.O] - r[INV.RC], num: true,
+          cell: r => { const v = r[INV.O] - r[INV.RC]; return v > 0 ? nf(v) : '<span class="zero">0</span>'; } },
+        { label: 'Issued', value: r => r[INV.IS], num: true, cell: r => r[INV.IS] ? nf(r[INV.IS]) : '<span class="zero">0</span>' },
+        { label: 'Available', value: r => r[INV.AV], num: true, cell: stockDot },
+        { label: 'On hand', value: r => r[INV.OH], num: true, cell: r => nf(r[INV.OH]) },
+        { label: 'Est. delivery date', value: r => deliveryDateOf(r[1], 'estimated') || localDate(S(r[INV.ESTD])),
+          cell: r => {
+            const manual = deliveryDateOf(r[1], 'estimated');
+            const shown = manual || localDate(S(r[INV.ESTD]));
+            const title = manual ? 'Entered by hand on this dashboard'
+              : shown ? 'From the PO created date, as SiteSense’s Orders page shows it. Pick a date to override.'
+              : 'No PO linked to this stock line';
+            return `<input type="date" class="deliv-pick${manual ? '' : ' deliv-default'}" data-m="${r[1]}" data-field="estimated" value="${shown}" title="${title}">`;
+          } },
+        { label: 'Promised delivery date', value: r => deliveryDateOf(r[1], 'promised'),
+          cell: r => `<input type="date" class="deliv-pick" data-m="${r[1]}" data-field="promised" value="${deliveryDateOf(r[1], 'promised')}">` },
+        { label: 'Location received into', value: r => receivedLoc(r[0], r[1]),
+          cell: r => { const v = receivedLoc(r[0], r[1]); return v ? `<span class="clip" title="${esc(v)}">${esc(v)}</span>` : '<span class="zero">—</span>'; } },
+        { label: 'Checked by', value: r => receivedBy(r[0], r[1]),
+          cell: r => esc(receivedBy(r[0], r[1])) || '<span class="zero">—</span>' },
+      ], rows, { sortAt: 9, exportName: 'Inventory',
+        onRepaint: sc => sc.querySelectorAll('.deliv-pick').forEach(inp => {
+          inp.onchange = () => { setDeliveryDate(+inp.dataset.m, inp.dataset.field, inp.value); saveDeliveryDates(); };
+        }) })));
+
+    host.appendChild(el(`<p class="notice" style="margin-top:14px">
+      <strong>Estimated Delivery Date is derived; Promised Delivery Date is entered by hand.</strong>
+      SiteSense's Orders page shows Estimated Delivery Date equal to the PO's created date on every PO
+      checked, and the API exposes no separate field for it, so the dashed dates here come from the most
+      recent PO on each stock line. Pick a date to override one (it then shows solid). Promised Delivery
+      Date has no source in the API and is blank until entered. Edits are remembered in this browser; to
+      survive the next refresh, click <em>Download delivery_dates.json</em> above and save it into the
+      dashboard folder, replacing the file there.</p>`));
+  }
+  render();
+}
+
+// ================================================================ TAB: Storage
+// storage row: [p, m, locIdx, condIdx, qty]
+const stoState = {};
+
+function tabStorage(stage) {
+  const st = stoState;
+
+  const passes = (r, skip) => {
+    if (!inScope(r[0])) return false;
+    if (skip !== 'loc' && st.loc && S(r[2]) !== st.loc) return false;
+    if (skip !== 'cond' && st.cond && S(r[3]) !== st.cond) return false;
+    if (skip !== 'type' && st.type && matType(r[1]) !== st.type) return false;
+    if (skip !== 'q') {
+      const q = (st.q || '').toLowerCase();
+      if (q && !(matName(r[1]).toLowerCase().includes(q) || matDesc(r[1]).toLowerCase().includes(q))) return false;
+    }
+    return true;
+  };
+  const optsFor = (key, get) => uniqSorted(D.storage.filter(r => passes(r, key)).map(get));
+
+  const rail = buildRail([
+    { key: 'q', type: 'search', label: 'Material', placeholder: 'Name or description' },
+    { key: 'loc', type: 'select', label: 'Location', anyLabel: 'All locations',
+      options: () => optsFor('loc', r => S(r[2])) },
+    { key: 'cond', type: 'select', label: 'Condition', anyLabel: 'Any condition',
+      options: () => optsFor('cond', r => S(r[3])) },
+    { key: 'type', type: 'select', label: 'Material type', anyLabel: 'All types',
+      options: () => optsFor('type', r => matType(r[1])) },
+  ], st, () => render());
+  stage.appendChild(rail);
+  const host = el('<div></div>');
+  stage.appendChild(host);
+
+  const LABELS = { q: 'Material', loc: 'Location', cond: 'Condition', type: 'Type' };
+
+  function render() {
+    rail.sync();
+    const rows = D.storage.filter(r => passes(r));
+
+    host.textContent = '';
+    const chips = activeChips(stoState, LABELS, render);
+    if (chips) host.appendChild(chips);
+    if (!rows.length) { host.appendChild(el('<p class="notice">No stored stock matches these filters.</p>')); return; }
+
+    const flagged = rows.filter(r => !['Pass', 'Checked'].includes(S(r[3]))).length;
+    host.appendChild(strip([
+      { label: 'Stored lines', value: nf(rows.length) },
+      { label: 'Locations', value: nf(new Set(rows.map(r => r[2])).size) },
+      { label: 'Distinct materials', value: nf(new Set(rows.map(r => r[1])).size) },
+      { label: 'Projects', value: nf(new Set(rows.map(r => r[0])).size) },
+      { label: 'Not passed', value: nf(flagged), flag: flagged > 0 },
+    ]));
+
+    // Counted, not summed: stored quantities mix units of measure between rows.
+    const byLoc = {}, byCond = {};
+    rows.forEach(r => {
+      byLoc[S(r[2])] = (byLoc[S(r[2])] || 0) + 1;
+      byCond[S(r[3]) || 'Unchecked'] = (byCond[S(r[3]) || 'Unchecked'] || 0) + 1;
+    });
+    const top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, value]) => ({ label, value }));
+
+    host.appendChild(chartPair(
+      { title: 'Stored lines by location', hint: 'Number of material records held at each location. Click a bar to filter.',
+        rows: top(byLoc, 9),
+        opts: { padL: 200, aria: 'Stored lines by location',
+                pick: r => { pickValue(stoState, 'loc', r.label); render(); } } },
+      { title: 'Stored lines by condition', hint: 'Click a bar to filter.',
+        rows: top(byCond, 9),
+        opts: { color: cvar('--s4'), padL: 120, aria: 'Stored lines by condition',
+                pick: r => { pickValue(stoState, 'cond', r.label); render(); } } }));
+
+    const condCell = r => {
+      const c = S(r[3]);
+      const cls = c === 'Pass' || c === 'Checked' ? 'dot-ok'
+                : (c === 'Damage' || c === 'Fail') ? 'dot-alert'
+                : c ? 'dot-warn' : '';
+      return `<span class="dot ${cls}">${esc(c || 'Unchecked')}</span>`;
+    };
+
+    host.appendChild(block('Stored material detail', 'One row per material per location, matching the SiteSense Storage report.',
+      dataTable([
+        { label: 'Resource', value: r => matName(r[1]),
+          cell: r => `<span class="clip" title="${esc(matName(r[1]))}">${esc(matName(r[1]))}</span>` +
+                     (matDesc(r[1]) ? `<span class="sub clip clip-wide" title="${esc(matDesc(r[1]))}">${esc(matDesc(r[1]))}</span>` : '') },
+        { label: 'Location', value: r => S(r[2]),
+          cell: r => `<span class="clip" title="${esc(S(r[2]))}">${esc(S(r[2]))}</span>` },
+        { label: 'Project', value: r => PROJ[r[0]],
+          cell: r => `<span class="clip" title="${esc(PROJ[r[0]])}">${esc(PROJ[r[0]])}</span>` },
+        { label: 'Quantity', value: r => r[4], num: true, cell: r => nf(r[4]) },
+        { label: 'UOM', value: r => matUom(r[1]) },
+        { label: 'Status', value: r => S(r[3]), cell: condCell },
+      ], rows, { sortAt: 3, exportName: 'Storage' })));
+  }
+  render();
+}
+
+// ================================================================ TAB: FIM (Free Issue Material)
+// fim row: [p, m, loc, container, workPackage, qty, status, received, issued, available]
+const F = { LOC: 2, CON: 3, WP: 4, QTY: 5, ST: 6, RCV: 7, ISS: 8, AVL: 9 };
+const FIM_STOCK_TESTS = {
+  'Available on site': r => r[F.AVL] > 0,
+  'Received': r => r[F.RCV] > 0,
+  'Issued': r => r[F.ISS] > 0,
+  'Registered, nothing received': r => !r[F.RCV] && !r[F.AVL] && !r[F.QTY],
+};
+const fimState = {};
+
+function tabFim(stage) {
+  const st = fimState;
+  const DATA = D.fim || [];
+
+  const passes = (r, skip) => {
+    if (!inScope(r[0])) return false;
+    if (skip !== 'loc' && st.loc && S(r[F.LOC]) !== st.loc) return false;
+    if (skip !== 'wp' && st.wp && S(r[F.WP]) !== st.wp) return false;
+    if (skip !== 'status' && st.status && S(r[F.ST]) !== st.status) return false;
+    if (skip !== 'con' && st.con === 'In a container' && !S(r[F.CON])) return false;
+    if (skip !== 'con' && st.con === 'Loose' && S(r[F.CON])) return false;
+    if (skip !== 'stock' && st.stock && !FIM_STOCK_TESTS[st.stock](r)) return false;
+    if (skip !== 'q') {
+      const q = (st.q || '').toLowerCase();
+      if (q && !(matName(r[1]).toLowerCase().includes(q) || matDesc(r[1]).toLowerCase().includes(q)
+                 || S(r[F.CON]).toLowerCase().includes(q) || S(r[F.WP]).toLowerCase().includes(q))) return false;
+    }
+    return true;
+  };
+  const optsFor = (key, get) => uniqSorted(DATA.filter(r => passes(r, key)).map(get));
+
+  const rail = buildRail([
+    { key: 'q', type: 'search', label: 'Part, container or work package', placeholder: 'Search FIM' },
+    { key: 'wp', type: 'select', label: 'Work package', anyLabel: 'All work packages',
+      options: () => optsFor('wp', r => S(r[F.WP])) },
+    { key: 'loc', type: 'select', label: 'Location', anyLabel: 'All locations',
+      options: () => optsFor('loc', r => S(r[F.LOC])) },
+    { key: 'status', type: 'select', label: 'Status', anyLabel: 'Any status',
+      options: () => optsFor('status', r => S(r[F.ST])) },
+    { key: 'con', type: 'select', label: 'Container', anyLabel: 'Any',
+      options: () => {
+        const base = DATA.filter(r => passes(r, 'con'));
+        return ['In a container', 'Loose'].filter(v =>
+          base.some(r => v === 'In a container' ? S(r[F.CON]) : !S(r[F.CON])));
+      } },
+    { key: 'stock', type: 'select', label: 'Stock state', anyLabel: 'Any state',
+      options: () => {
+        const base = DATA.filter(r => passes(r, 'stock'));
+        return Object.keys(FIM_STOCK_TESTS).filter(k => base.some(FIM_STOCK_TESTS[k]));
+      } },
+  ], st, () => render());
+  stage.appendChild(rail);
+  const host = el('<div></div>');
+  stage.appendChild(host);
+
+  const LABELS = { q: 'Search', wp: 'Work package', loc: 'Location', status: 'Status',
+                   con: 'Container', stock: 'Stock state' };
+
+  function render() {
+    rail.sync();
+    const rows = DATA.filter(r => passes(r));
+
+    host.textContent = '';
+    const chips = activeChips(st, LABELS, render);
+    if (chips) host.appendChild(chips);
+
+    if (!DATA.length) {
+      host.appendChild(el(`<p class="notice">No free issue material in this dataset. Re-run
+        <code>fetch_data.py</code> to pull it.</p>`));
+      return;
+    }
+    if (!rows.length) { host.appendChild(el('<p class="notice">No FIM matches these filters.</p>')); return; }
+
+    const containers = new Set(rows.map(r => S(r[F.CON])).filter(Boolean));
+    // Received, issued and available are per part per project, so they are counted
+    // once per part rather than summed over every location the part appears in.
+    const byPart = new Map();
+    rows.forEach(r => { const k = r[0] + ':' + r[1]; if (!byPart.has(k)) byPart.set(k, r); });
+    const parts = [...byPart.values()];
+    const sum = k => parts.reduce((a, r) => a + r[k], 0);
+
+    const awaiting = parts.filter(r => !r[F.RCV] && !r[F.AVL] && !r[F.QTY]).length;
+    host.appendChild(strip([
+      { label: 'FIM rows', value: nf(rows.length) },
+      { label: 'Distinct parts', value: nf(parts.length) },
+      { label: 'Containers', value: nf(containers.size) },
+      { label: 'Locations', value: nf(new Set(rows.map(r => S(r[F.LOC])).filter(Boolean)).size) },
+      { label: 'Received', value: nf(sum(F.RCV)) },
+      { label: 'Issued', value: nf(sum(F.ISS)) },
+      { label: 'Available', value: nf(sum(F.AVL)) },
+      { label: 'Nothing received', value: nf(awaiting), flag: awaiting > 0 },
+      { label: 'Work packages', value: nf(new Set(rows.map(r => S(r[F.WP])).filter(Boolean)).size) },
+    ]));
+
+    host.appendChild(el(`<p class="notice" style="margin-bottom:22px"><strong>What counts as FIM.</strong>
+      A part is free issue material when its work package name begins with <em>FIM</em>, which is the
+      naming convention the projects use when loading client supplied material into SiteSense. Parts
+      on other work packages, such as Consumables General or LV Cables, are normal procurement and are
+      not included. Received, issued and available are per part, so they are counted once even where a
+      part sits in several locations or containers.</p>`));
+
+    const byWp = {}, byLoc = {};
+    rows.forEach(r => {
+      const w = S(r[F.WP]) || '(none recorded)';
+      byWp[w] = (byWp[w] || 0) + 1;
+      const l = S(r[F.LOC]) || '(no tracked location)';
+      byLoc[l] = (byLoc[l] || 0) + 1;
+    });
+    const top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, value]) => ({ label, value }));
+
+    host.appendChild(chartPair(
+      { title: 'FIM rows by work package', hint: 'Click a bar to filter.',
+        rows: top(byWp, 9),
+        opts: { padL: 210, aria: 'FIM by work package',
+                pick: r => { pickValue(st, 'wp', r.label === '(none recorded)' ? '' : r.label); render(); } } },
+      { title: 'FIM rows by location', hint: 'Click a bar to filter.',
+        rows: top(byLoc, 9),
+        opts: { color: cvar('--s3'), padL: 210, aria: 'FIM by location',
+                pick: r => { pickValue(st, 'loc', r.label === '(no tracked location)' ? '' : r.label); render(); } } }));
+
+    const statusCell = r => {
+      const c = S(r[F.ST]);
+      const cls = ['Pass', 'Checked'].includes(c) ? 'dot-ok'
+                : ['Damage', 'Fail'].includes(c) ? 'dot-alert' : c ? 'dot-warn' : '';
+      return `<span class="dot ${cls}">${esc(c || 'Not recorded')}</span>`;
+    };
+
+    host.appendChild(block('Free issue material', 'One row per part per location and container.',
+      dataTable([
+        { label: 'Location', value: r => S(r[F.LOC]),
+          cell: r => `<span class="clip" title="${esc(S(r[F.LOC]))}">${esc(S(r[F.LOC]) || 'Not located')}</span>` },
+        { label: 'Container', value: r => S(r[F.CON]),
+          cell: r => S(r[F.CON]) ? `<span class="clip" title="${esc(S(r[F.CON]))}">${esc(S(r[F.CON]))}</span>`
+                                 : '<span class="zero">loose</span>' },
+        { label: 'Part name', value: r => matName(r[1]),
+          cell: r => `<span class="clip clip-wide" title="${esc(matName(r[1]))}">${esc(matName(r[1]))}</span>` },
+        { label: 'Part description', value: r => matDesc(r[1]),
+          cell: r => matDesc(r[1]) ? `<span class="clip clip-wide" title="${esc(matDesc(r[1]))}">${esc(matDesc(r[1]))}</span>`
+                                   : '<span class="zero">—</span>' },
+        { label: 'Work package', value: r => S(r[F.WP]),
+          cell: r => S(r[F.WP]) ? `<span class="clip" title="${esc(S(r[F.WP]))}">${esc(S(r[F.WP]))}</span>`
+                                : '<span class="zero">none</span>' },
+        { label: 'Qty', value: r => r[F.QTY], num: true, cell: r => nf(r[F.QTY]) },
+        { label: 'UOM', value: r => matUom(r[1]) },
+        { label: 'Status', value: r => S(r[F.ST]), cell: statusCell },
+        { label: 'Received', value: r => r[F.RCV], num: true,
+          cell: r => r[F.RCV] ? nf(r[F.RCV]) : '<span class="zero">0</span>' },
+        { label: 'Issued', value: r => r[F.ISS], num: true,
+          cell: r => r[F.ISS] ? nf(r[F.ISS]) : '<span class="zero">0</span>' },
+        { label: 'Available', value: r => r[F.AVL], num: true,
+          cell: r => r[F.AVL] > 0 ? `<span class="dot dot-ok">${nf(r[F.AVL])}</span>` : '<span class="zero">0</span>' },
+        { label: 'Project', value: r => PROJ[r[0]],
+          cell: r => `<span class="clip" title="${esc(PROJ[r[0]])}">${esc(PROJ[r[0]])}</span>` },
+      ], rows, { sortAt: 0, sortDir: 1, exportName: 'FIM' })));
+  }
+  render();
+}
+
+// ================================================================ TAB: Transfers
+// transfer row: [p, m, docIdx, statusIdx, qty, fromIdx, toIdx, dateIdx, monthIdx]
+const trState = {};
+
+function tabTransfers(stage) {
+  const st = trState;
+
+  const passes = (r, skip) => {
+    if (!inScope(r[0])) return false;
+    if (skip !== 'from' && st.from && S(r[5]) !== st.from) return false;
+    if (skip !== 'to' && st.to && S(r[6]) !== st.to) return false;
+    if (skip !== 'status' && st.status && S(r[3]) !== st.status) return false;
+    if (skip !== 'month' && st.month && S(r[8]) !== st.month) return false;
+    if (skip !== 'q') {
+      const q = (st.q || '').toLowerCase();
+      if (q && !(matName(r[1]).toLowerCase().includes(q) || matDesc(r[1]).toLowerCase().includes(q)
+                 || S(r[2]).toLowerCase().includes(q))) return false;
+    }
+    return true;
+  };
+  const optsFor = (key, get) => uniqSorted(D.transfers.filter(r => passes(r, key)).map(get));
+
+  const rail = buildRail([
+    { key: 'q', type: 'search', label: 'Material or transfer', placeholder: 'Material, description or TRN number' },
+    { key: 'from', type: 'select', label: 'From location', anyLabel: 'Any origin',
+      options: () => optsFor('from', r => S(r[5])) },
+    { key: 'to', type: 'select', label: 'To location', anyLabel: 'Any destination',
+      options: () => optsFor('to', r => S(r[6])) },
+    { key: 'status', type: 'select', label: 'Status', anyLabel: 'Any status',
+      options: () => optsFor('status', r => S(r[3])) },
+    { key: 'month', type: 'select', label: 'Month created', anyLabel: 'All months',
+      options: () => optsFor('month', r => S(r[8])) },
+  ], st, () => render());
+  stage.appendChild(rail);
+  const host = el('<div></div>');
+  stage.appendChild(host);
+
+  const LABELS = { q: 'Search', from: 'From', to: 'To', status: 'Status', month: 'Month' };
+
+  function render() {
+    rail.sync();
+    const rows = D.transfers.filter(r => passes(r));
+
+    host.textContent = '';
+    const chips = activeChips(trState, LABELS, render);
+    if (chips) host.appendChild(chips);
+    if (!rows.length) { host.appendChild(el('<p class="notice">No transfer lines match these filters.</p>')); return; }
+
+    host.appendChild(strip([
+      { label: 'Transfer lines', value: nf(rows.length) },
+      { label: 'Transfer documents', value: nf(new Set(rows.map(r => r[2])).size) },
+      { label: 'Distinct materials', value: nf(new Set(rows.map(r => r[1])).size) },
+      { label: 'Origins', value: nf(new Set(rows.map(r => S(r[5])).filter(Boolean)).size) },
+      { label: 'Destinations', value: nf(new Set(rows.map(r => S(r[6])).filter(Boolean)).size) },
+    ]));
+
+    const months = [...new Set(rows.map(r => S(r[8])).filter(Boolean))].sort();
+    const counts = {};
+    rows.forEach(r => { const m = S(r[8]); if (m) counts[m] = (counts[m] || 0) + 1; });
+    const series = [{ label: 'Transfer lines', values: months.map(m => counts[m] || 0) }];
+    host.appendChild(block('Transfer activity by month',
+      'Counted on the month the transfer was created. Click a point to filter to that month.',
+      keyRow(series), lineChart(series, months, { aria: 'Transfer lines per month',
+        pick: m => { pickValue(trState, 'month', m); render(); } })));
+
+    // Counted, not summed: transfer quantities mix units of measure between rows.
+    const byTo = {}, byMat = {};
+    rows.forEach(r => {
+      const to = S(r[6]) || '(unspecified)';
+      byTo[to] = (byTo[to] || 0) + 1;
+      byMat[matName(r[1])] = (byMat[matName(r[1])] || 0) + 1;
+    });
+    const top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, value]) => ({ label, value }));
+    host.appendChild(chartPair(
+      { title: 'Transfer lines by destination', hint: 'Number of movements, not quantity. Click a bar to filter.',
+        rows: top(byTo, 9),
+        opts: { padL: 200, aria: 'Transfer lines by destination',
+                pick: r => { pickValue(trState, 'to', r.label === '(unspecified)' ? '' : r.label); render(); } } },
+      { title: 'Most frequently transferred materials', hint: 'Click a bar to search for that material.',
+        rows: top(byMat, 9),
+        opts: { color: cvar('--s2'), padL: 170, aria: 'Transfer lines by material',
+                pick: r => { pickValue(trState, 'q', r.label); render(); } } }));
+
+    host.appendChild(block('Transfer lines by material', 'One row per material per transfer document.',
+      dataTable([
+        { label: 'Transfer', value: r => S(r[2]), cell: r => `<span class="clip" title="${esc(S(r[2]))}">${esc(S(r[2]))}</span>` },
+        { label: 'Material', value: r => matName(r[1]),
+          cell: r => `<span class="clip" title="${esc(matName(r[1]))}">${esc(matName(r[1]))}</span>` +
+                     (matDesc(r[1]) ? `<span class="sub clip clip-wide" title="${esc(matDesc(r[1]))}">${esc(matDesc(r[1]))}</span>` : '') },
+        { label: 'Qty', value: r => r[4], num: true, cell: r => nf(r[4]) },
+        { label: 'UOM', value: r => matUom(r[1]) },
+        { label: 'From', value: r => S(r[5]), cell: r => `<span class="clip" title="${esc(S(r[5]))}">${esc(S(r[5]) || '—')}</span>` },
+        { label: 'To', value: r => S(r[6]), cell: r => `<span class="clip" title="${esc(S(r[6]))}">${esc(S(r[6]) || '—')}</span>` },
+        { label: 'Status', value: r => S(r[3]) },
+        { label: 'Updated', value: r => S(r[7]) },
+      ], rows, { sortAt: 7, exportName: 'Transfers' })));
+  }
+  render();
+}
+
+// ================================================================ TAB: Asset Tracking
+// asset row: [p, m, costIdx, typeIdx, ordered, received, issued, returned, unitCost, posIdx, receiptsIdx]
+const A = { COST: 2, TYPE: 3, ORD: 4, RCV: 5, ISS: 6, RET: 7, UC: 8, PO: 9, RCPT: 10 };
+const astState = {};
+
+const FULFIL_TESTS = {
+  'Outstanding': r => r[A.ORD] - r[A.RCV] > 0,
+  'Fully received': r => r[A.ORD] > 0 && r[A.ORD] - r[A.RCV] <= 0,
+  'Over received': r => r[A.ORD] - r[A.RCV] < 0,
+  'Issued for installation': r => r[A.ISS] > 0,
+  'Returned to vendor': r => r[A.RET] > 0,
+};
+
+function tabAssets(stage) {
+  const st = astState;
+
+  /* One predicate drives both the visible rows and the dropdown contents.
+     `skip` leaves out a single filter so that a dropdown still offers its own
+     alternatives instead of collapsing to the value already chosen. */
+  const passes = (r, skip) => {
+    if (!inScope(r[0])) return false;
+    if (skip !== 'cost' && st.cost && S(r[A.COST]) !== st.cost) return false;
+    if (skip !== 'itype' && st.itype && S(r[A.TYPE]) !== st.itype) return false;
+    if (skip !== 'q') {
+      const q = (st.q || '').toLowerCase();
+      if (q && !(matName(r[1]).toLowerCase().includes(q) || matDesc(r[1]).toLowerCase().includes(q)
+                 || S(r[A.PO]).toLowerCase().includes(q))) return false;
+    }
+    if (skip !== 'fulfil' && st.fulfil && FULFIL_TESTS[st.fulfil] && !FULFIL_TESTS[st.fulfil](r)) return false;
+    return true;
+  };
+  const optsFor = (key, get) => uniqSorted(D.assets.filter(r => passes(r, key)).map(get));
+
+  const rail = buildRail([
+    { key: 'q', type: 'search', label: 'Part or PO', placeholder: 'Part, description or PO number' },
+    { key: 'cost', type: 'select', label: 'Cost code', anyLabel: 'All cost codes',
+      options: () => optsFor('cost', r => S(r[A.COST])) },
+    { key: 'itype', type: 'select', label: 'Line item type', anyLabel: 'All line types',
+      options: () => optsFor('itype', r => S(r[A.TYPE])) },
+    { key: 'fulfil', type: 'select', label: 'Fulfilment', anyLabel: 'Any',
+      options: () => {
+        const base = D.assets.filter(r => passes(r, 'fulfil'));
+        return Object.keys(FULFIL_TESTS).filter(k => base.some(FULFIL_TESTS[k]));
+      } },
+  ], st, () => render());
+  stage.appendChild(rail);
+  const host = el('<div></div>');
+  stage.appendChild(host);
+
+  const LABELS = { q: 'Search', cost: 'Cost code', itype: 'Line type', fulfil: 'Fulfilment' };
+
+  function render() {
+    rail.sync();
+    const rows = D.assets.filter(r => passes(r));
+
+    host.textContent = '';
+    const chips = activeChips(astState, LABELS, render);
+    if (chips) host.appendChild(chips);
+    if (!rows.length) { host.appendChild(el('<p class="notice">No parts match these filters.</p>')); return; }
+
+    /* Every headline below is a COUNT of parts or a DOLLAR value. Both are
+       additive. Raw quantities are not: one row may be metres of cable and the
+       next a lump sum, so summing them portfolio-wide is meaningless. Quantities
+       stay in the table where each row carries a single unit. */
+    const ordered = rows.filter(r => r[A.ORD] > 0);
+    const complete = ordered.filter(r => r[A.ORD] - r[A.RCV] <= 0 && r[A.RCV] > 0);
+    const shortRows = rows.filter(r => r[A.ORD] - r[A.RCV] > 0);
+    const over = rows.filter(r => r[A.ORD] - r[A.RCV] < 0);
+    const openValue = shortRows.reduce((a, r) => a + (r[A.ORD] - r[A.RCV]) * r[A.UC], 0);
+
+    host.appendChild(strip([
+      { label: 'Parts tracked', value: nf(rows.length) },
+      { label: 'Fully received', value: nf(complete.length) },
+      { label: 'Parts received', value: ordered.length ? (complete.length / ordered.length * 100).toFixed(1) : '0.0', unit: '%' },
+      { label: 'Outstanding', value: nf(shortRows.length), flag: shortRows.length > 0 },
+      { label: 'Over received', value: nf(over.length) },
+      { label: 'Parts issued', value: nf(rows.filter(r => r[A.ISS] > 0).length) },
+      { label: 'Parts returned', value: nf(rows.filter(r => r[A.RET] > 0).length) },
+    ]));
+
+    const notes = el('<div class="notes"></div>');
+    notes.appendChild(el(`<details class="notice"><summary><strong>Reading this tab</strong></summary>
+      <div>Figures are joined on the material record, the only key shared by purchase orders, receipts,
+      issue tickets and return notices. Headline figures count parts rather than summing quantities,
+      because quantities mix units of measure across rows. Use the <em>Line item type</em> filter to
+      separate physical materials from services, hire and lump sum lines, which are ordered but never
+      received into stock and would otherwise read as permanently outstanding.</div></details>`));
+
+    /* Open value is deliberately NOT a headline figure. Unit costs in the source
+       data are not consistently per-unit: several cable lines carry a per-drum
+       price against a quantity in metres, which inflates value by orders of
+       magnitude. Value is shown per row instead, beside quantity, unit and unit
+       cost, so it can be judged rather than trusted blindly. */
+    const rank = [...rows].map(r => Math.max(0, r[A.ORD] - r[A.RCV]) * (r[A.UC] || 0)).sort((a, b) => b - a);
+    const top10Share = rank.length && openValue > 0
+      ? (rank.slice(0, 10).reduce((a, v) => a + v, 0) / openValue * 100).toFixed(0) : '0';
+    notes.appendChild(el(`<details class="notice"><summary><strong>Open order value:
+      $${nf(Math.round(openValue))}, indicative only</strong></summary>
+      <div>Unit costs are not reliably per-unit in the source data. Several cable lines carry what looks
+      like a per-drum or per-reel price against a quantity in metres, which inflates their value by
+      orders of magnitude. The ten largest rows alone account for ${top10Share}% of this figure.
+      Sort the table by <em>Open value</em> to review the biggest contributors, and check
+      <em>Unit cost</em> against <em>Unit</em> before relying on any total. Correcting these in
+      Procore would make this figure dependable.</div></details>`));
+    host.appendChild(notes);
+
+    // Counting outstanding parts per cost code is robust to the unit cost problem
+    // described above; the value view sits beside it for review, not for totals.
+    const byCost = {};
+    rows.forEach(r => {
+      if (r[A.ORD] - r[A.RCV] <= 0) return;
+      const c = S(r[A.COST]) || '(no cost code)';
+      byCost[c] = (byCost[c] || 0) + 1;
+    });
+    const topCost = Object.entries(byCost).sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([label, value]) => ({ label, value, note: 'Parts outstanding' }));
+
+    const topValue = rows.map(r => ({
+        label: matName(r[1]),
+        value: Math.round(Math.max(0, r[A.ORD] - r[A.RCV]) * (r[A.UC] || 0)),
+        note: `${PROJ[r[0]]}\n${nf(r[A.ORD] - r[A.RCV])} ${matUom(r[1])} outstanding at $${nf(r[A.UC])} per ${matUom(r[1]) || 'unit'}`,
+      })).filter(x => x.value > 0).sort((a, b) => b.value - a.value).slice(0, 12);
+
+    host.appendChild(chartPair(
+      { title: 'Outstanding parts by cost code',
+        hint: 'Counted, so it is unaffected by unit cost errors. Click a bar to filter.',
+        rows: topCost,
+        opts: { color: cvar('--s8'), padL: 220, aria: 'Outstanding parts by cost code',
+                pick: r => { pickValue(astState, 'cost', r.label === '(no cost code)' ? '' : r.label); render(); } } },
+      { title: 'Largest open value by part',
+        hint: 'Review these first. Hover to check quantity against unit cost, click to isolate the part.',
+        rows: topValue,
+        opts: { color: cvar('--s2'), padL: 180, aria: 'Open value by part',
+                pick: r => { pickValue(astState, 'q', r.label); render(); } } }));
+
+    const gapCell = r => {
+      const g = r[A.ORD] - r[A.RCV];
+      if (g > 0) return `<span class="short">${nf(g)}</span>`;
+      if (g < 0) return `<span class="dot dot-warn">${nf(g)}</span>`;
+      return `<span class="zero">0</span>`;
+    };
+
+    host.appendChild(block('Asset tracking detail', 'One row per part per project, with the purchase orders and receipts it appears on.',
+      dataTable([
+        { label: 'Cost code', value: r => S(r[A.COST]),
+          cell: r => `<span class="clip" title="${esc(S(r[A.COST]))}">${esc(S(r[A.COST]) || '—')}</span>` },
+        { label: 'Part', value: r => matName(r[1]),
+          cell: r => `<span class="clip clip-wide" title="${esc(matName(r[1]))}">${esc(matName(r[1]))}</span>` +
+                     (matDesc(r[1]) ? `<span class="sub clip clip-wide" title="${esc(matDesc(r[1]))}">${esc(matDesc(r[1]))}</span>` : '') },
+        { label: 'Project', value: r => PROJ[r[0]],
+          cell: r => `<span class="clip" title="${esc(PROJ[r[0]])}">${esc(PROJ[r[0]])}</span>` },
+        { label: 'Receipts', value: r => S(r[A.RCPT]),
+          cell: r => `<span class="clip" title="${esc(S(r[A.RCPT]))}">${esc(S(r[A.RCPT]) || '—')}</span>` },
+        { label: 'Purchase order', value: r => S(r[A.PO]),
+          cell: r => `<span class="clip" title="${esc(S(r[A.PO]))}">${esc(S(r[A.PO]) || '—')}</span>` },
+        { label: 'Unit', value: r => matUom(r[1]) },
+        { label: 'Order qty', value: r => r[A.ORD], num: true, cell: r => nf(r[A.ORD]) },
+        { label: 'Received qty', value: r => r[A.RCV], num: true, cell: r => nf(r[A.RCV]) },
+        { label: 'Outstanding', value: r => r[A.ORD] - r[A.RCV], num: true, cell: gapCell },
+        { label: 'Unit cost', value: r => r[A.UC], num: true,
+          cell: r => r[A.UC] ? '$' + nf(r[A.UC]) : '<span class="zero">n/a</span>' },
+        { label: 'Open value', value: r => Math.max(0, r[A.ORD] - r[A.RCV]) * (r[A.UC] || 0), num: true,
+          cell: r => { const v = Math.max(0, r[A.ORD] - r[A.RCV]) * (r[A.UC] || 0);
+                       return v ? '$' + nf(Math.round(v)) : '<span class="zero">0</span>'; } },
+        { label: 'Returned to vendor', value: r => r[A.RET], num: true, cell: r => r[A.RET] ? nf(r[A.RET]) : '<span class="zero">0</span>' },
+        { label: 'Issued for install', value: r => r[A.ISS], num: true, cell: r => r[A.ISS] ? nf(r[A.ISS]) : '<span class="zero">0</span>' },
+      ], rows, { sortAt: 8, exportName: 'Asset_Tracking' })));
+  }
+  render();
+}
+
+// ================================================================ TAB: Receipts
+// receipt row: [p, m, receipt, docStatus, cond, loc, checkedBy, shipment, po,
+//               costCode, itemType, qty, unitCost, date, month, lineNo, poDesc, poDate]
+const R = { DOC: 2, ST: 3, COND: 4, LOC: 5, BY: 6, SHIP: 7, PO: 8, COST: 9,
+            TYPE: 10, QTY: 11, UC: 12, DATE: 13, MONTH: 14, LINE: 15, PODESC: 16, PODATE: 17 };
+const recState = {};
+
+function tabReceipts(stage) {
+  const st = recState;
+  const DATA = D.receipts || [];
+
+  const passes = (r, skip) => {
+    if (!inScope(r[0])) return false;
+    if (skip !== 'status' && st.status && S(r[R.ST]) !== st.status) return false;
+    if (skip !== 'cond' && st.cond && S(r[R.COND]) !== st.cond) return false;
+    if (skip !== 'loc' && st.loc && S(r[R.LOC]) !== st.loc) return false;
+    if (skip !== 'by' && st.by && S(r[R.BY]) !== st.by) return false;
+    if (skip !== 'month' && st.month && S(r[R.MONTH]) !== st.month) return false;
+    if (skip !== 'q') {
+      const q = (st.q || '').toLowerCase();
+      if (q && !(matName(r[1]).toLowerCase().includes(q) || matDesc(r[1]).toLowerCase().includes(q)
+                 || S(r[R.DOC]).toLowerCase().includes(q) || S(r[R.PO]).toLowerCase().includes(q)
+                 || S(r[R.SHIP]).toLowerCase().includes(q))) return false;
+    }
+    return true;
+  };
+  const optsFor = (key, get) => uniqSorted(DATA.filter(r => passes(r, key)).map(get));
+
+  const rail = buildRail([
+    { key: 'q', type: 'search', label: 'Receipt, part, PO or shipment', placeholder: 'Search any reference' },
+    { key: 'status', type: 'select', label: 'Document status', anyLabel: 'Any status',
+      options: () => optsFor('status', r => S(r[R.ST])) },
+    { key: 'cond', type: 'select', label: 'Receipt status', anyLabel: 'Any status',
+      options: () => optsFor('cond', r => S(r[R.COND])) },
+    { key: 'loc', type: 'select', label: 'Storage location', anyLabel: 'All locations',
+      options: () => optsFor('loc', r => S(r[R.LOC])) },
+    { key: 'by', type: 'select', label: 'Checked by', anyLabel: 'Anyone',
+      options: () => optsFor('by', r => S(r[R.BY])) },
+    { key: 'month', type: 'select', label: 'Month received', anyLabel: 'All months',
+      options: () => optsFor('month', r => S(r[R.MONTH])) },
+  ], st, () => render());
+  stage.appendChild(rail);
+  const host = el('<div></div>');
+  stage.appendChild(host);
+
+  const LABELS = { q: 'Search', status: 'Status', cond: 'Receipt status', loc: 'Location',
+                   by: 'Checked by', month: 'Month' };
+
+  function render() {
+    rail.sync();
+    const rows = DATA.filter(r => passes(r));
+
+    host.textContent = '';
+    const chips = activeChips(st, LABELS, render);
+    if (chips) host.appendChild(chips);
+    if (!DATA.length) {
+      host.appendChild(el(`<p class="notice">No receipt detail in this dataset. Re-run
+        <code>fetch_data.py</code> to pull it.</p>`));
+      return;
+    }
+    if (!rows.length) { host.appendChild(el('<p class="notice">No receipt lines match these filters.</p>')); return; }
+
+    const notPassed = rows.filter(r => !['Pass', 'Checked'].includes(S(r[R.COND]))).length;
+    const noPo = rows.filter(r => !S(r[R.PO])).length;
+    const value = rows.reduce((a, r) => a + r[R.QTY] * (r[R.UC] || 0), 0);
+    host.appendChild(strip([
+      { label: 'Receipt lines', value: nf(rows.length) },
+      { label: 'Receipts', value: nf(new Set(rows.map(r => r[R.DOC])).size) },
+      { label: 'Distinct parts', value: nf(new Set(rows.map(r => r[1])).size) },
+      { label: 'Received value', value: '$' + nf(Math.round(value)) },
+      { label: 'Not passed', value: nf(notPassed), flag: notPassed > 0 },
+      { label: 'No PO linked', value: nf(noPo), flag: noPo > 0 },
+    ]));
+
+    const months = [...new Set(rows.map(r => S(r[R.MONTH])).filter(Boolean))].sort();
+    const perMonth = {};
+    rows.forEach(r => { const m = S(r[R.MONTH]); if (m) perMonth[m] = (perMonth[m] || 0) + 1; });
+    const series = [{ label: 'Receipt lines', values: months.map(m => perMonth[m] || 0) }];
+    host.appendChild(block('Receiving activity by month', 'Counted on the received date. Click a point to filter.',
+      keyRow(series), lineChart(series, months, { aria: 'Receipt lines per month',
+        pick: m => { pickValue(st, 'month', m); render(); } })));
+
+    const byLoc = {}, byCond = {};
+    rows.forEach(r => {
+      const l = S(r[R.LOC]) || '(not recorded)';
+      byLoc[l] = (byLoc[l] || 0) + 1;
+      const c = S(r[R.COND]) || '(not recorded)';
+      byCond[c] = (byCond[c] || 0) + 1;
+    });
+    const top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, value]) => ({ label, value }));
+    host.appendChild(chartPair(
+      { title: 'Receipt lines by storage location', hint: 'Where goods were put away. Click a bar to filter.',
+        rows: top(byLoc, 9),
+        opts: { padL: 200, aria: 'Receipt lines by location',
+                pick: r => { pickValue(st, 'loc', r.label === '(not recorded)' ? '' : r.label); render(); } } },
+      { title: 'Receipt lines by receipt status', hint: 'Click a bar to filter.',
+        rows: top(byCond, 9),
+        opts: { color: cvar('--s4'), padL: 150, aria: 'Receipt lines by receipt status',
+                pick: r => { pickValue(st, 'cond', r.label === '(not recorded)' ? '' : r.label); render(); } } }));
+
+    const condCell = r => {
+      const c = S(r[R.COND]);
+      const cls = ['Pass', 'Checked'].includes(c) ? 'dot-ok'
+                : ['Damage', 'Fail', 'Short'].includes(c) ? 'dot-alert'
+                : c ? 'dot-warn' : '';
+      return `<span class="dot ${cls}">${esc(c || 'Not recorded')}</span>`;
+    };
+
+    host.appendChild(block('Receipt detail', 'One row per receipt line, matching the SiteSense Receipt Dashboard.',
+      dataTable([
+        { label: 'Receipt', value: r => S(r[R.DOC]),
+          cell: r => `<span class="clip" title="${esc(S(r[R.DOC]))}">${esc(S(r[R.DOC]))}</span>` },
+        { label: 'Status', value: r => S(r[R.ST]) },
+        { label: 'Received', value: r => S(r[R.DATE]) },
+        { label: 'PO', value: r => S(r[R.PO]),
+          cell: r => S(r[R.PO]) ? `<span class="clip" title="${esc(S(r[R.PO]))}">${esc(S(r[R.PO]))}</span>`
+                                : '<span class="zero">not linked</span>' },
+        { label: 'PO description', value: r => S(r[R.PODESC]),
+          cell: r => `<span class="clip clip-wide" title="${esc(S(r[R.PODESC]))}">${esc(S(r[R.PODESC]) || '—')}</span>` },
+        { label: 'PO date', value: r => S(r[R.PODATE]) },
+        { label: 'Shipment', value: r => S(r[R.SHIP]),
+          cell: r => `<span class="clip" title="${esc(S(r[R.SHIP]))}">${esc(S(r[R.SHIP]) || '—')}</span>` },
+        { label: 'Part', value: r => matName(r[1]),
+          cell: r => `<span class="clip clip-wide" title="${esc(matName(r[1]))}">${esc(matName(r[1]))}</span>`
+                   + (matDesc(r[1]) ? `<span class="sub clip clip-wide" title="${esc(matDesc(r[1]))}">${esc(matDesc(r[1]))}</span>` : '') },
+        { label: 'Qty', value: r => r[R.QTY], num: true, cell: r => nf(r[R.QTY]) },
+        { label: 'UOM', value: r => matUom(r[1]) },
+        { label: 'Receipt status', value: r => S(r[R.COND]), cell: condCell },
+        { label: 'Storage location', value: r => S(r[R.LOC]),
+          cell: r => `<span class="clip" title="${esc(S(r[R.LOC]))}">${esc(S(r[R.LOC]) || '—')}</span>` },
+        { label: 'Checked by', value: r => S(r[R.BY]) },
+        { label: 'Cost code', value: r => S(r[R.COST]),
+          cell: r => `<span class="clip" title="${esc(S(r[R.COST]))}">${esc(S(r[R.COST]) || '—')}</span>` },
+        { label: 'Unit cost', value: r => r[R.UC], num: true,
+          cell: r => r[R.UC] ? '$' + nf(r[R.UC]) : '<span class="zero">n/a</span>' },
+        { label: 'Line value', value: r => Math.round(r[R.QTY] * (r[R.UC] || 0)), num: true,
+          cell: r => { const v = r[R.QTY] * (r[R.UC] || 0); return v ? '$' + nf(Math.round(v)) : '<span class="zero">0</span>'; } },
+        { label: 'Project', value: r => PROJ[r[0]],
+          cell: r => `<span class="clip" title="${esc(PROJ[r[0]])}">${esc(PROJ[r[0]])}</span>` },
+      ], rows, { sortAt: 2, exportName: 'Receipts' })));
+  }
+  render();
+}
+
+// ================================================================ TAB: Issuing
+// issuing row: [p, m, issueTicket, status, request, pickTicket, requestedBy,
+//               reqQty, pickedQty, issuedQty, availQty, recipient, pickLoc, dateRaised]
+// The chain behind every row is Material Request -> Pick Ticket -> Issue Ticket,
+// each contributing part of the picture: requested quantity off the Request,
+// picked quantity and pick location off the Pick Ticket, issued quantity and
+// requestor off the Issue Ticket itself. Available quantity is the material's
+// current stock position, joined in from the same Inventory Counters as the
+// Inventory tab, not a field stored on any of the three documents.
+const ISS = { IT: 2, ST: 3, RQ: 4, PT: 5, REQBY: 6, REQQ: 7, PICKQ: 8, ISSQ: 9,
+              AVAILQ: 10, RECIP: 11, LOC: 12, DATE: 13 };
+const issState = {};
+
+function tabIssuing(stage) {
+  const st = issState;
+  const DATA = D.issuing || [];
+
+  const passes = (r, skip) => {
+    if (!inScope(r[0])) return false;
+    if (skip !== 'status' && st.status && S(r[ISS.ST]) !== st.status) return false;
+    if (skip !== 'by' && st.by && S(r[ISS.REQBY]) !== st.by) return false;
+    if (skip !== 'recip' && st.recip && S(r[ISS.RECIP]) !== st.recip) return false;
+    if (skip !== 'loc' && st.loc && S(r[ISS.LOC]) !== st.loc) return false;
+    if (skip !== 'q') {
+      const q = (st.q || '').toLowerCase();
+      if (q && !(matName(r[1]).toLowerCase().includes(q) || matDesc(r[1]).toLowerCase().includes(q)
+                 || S(r[ISS.IT]).toLowerCase().includes(q))) return false;
+    }
+    return true;
+  };
+  const optsFor = (key, get) => uniqSorted(DATA.filter(r => passes(r, key)).map(get));
+
+  const rail = buildRail([
+    { key: 'q', type: 'search', label: 'Part or Issue Ticket', placeholder: 'Name, description or ticket number' },
+    { key: 'status', type: 'select', label: 'Status', anyLabel: 'Any status',
+      options: () => optsFor('status', r => S(r[ISS.ST])) },
+    { key: 'by', type: 'select', label: 'Requested by', anyLabel: 'Anyone',
+      options: () => optsFor('by', r => S(r[ISS.REQBY])) },
+    { key: 'recip', type: 'select', label: 'Recipient', anyLabel: 'Anyone',
+      options: () => optsFor('recip', r => S(r[ISS.RECIP])) },
+    { key: 'loc', type: 'select', label: 'Pick location', anyLabel: 'All locations',
+      options: () => optsFor('loc', r => S(r[ISS.LOC])) },
+  ], st, () => render());
+  stage.appendChild(rail);
+  const host = el('<div></div>');
+  stage.appendChild(host);
+
+  const LABELS = { q: 'Search', status: 'Status', by: 'Requested by', recip: 'Recipient', loc: 'Pick location' };
+
+  function render() {
+    rail.sync();
+    const rows = DATA.filter(r => passes(r));
+
+    host.textContent = '';
+    const chips = activeChips(st, LABELS, render);
+    if (chips) host.appendChild(chips);
+    if (!DATA.length) {
+      host.appendChild(el(`<p class="notice">No issuing detail in this dataset. Re-run
+        <code>fetch_data.py</code> to pull it.</p>`));
+      return;
+    }
+    if (!rows.length) { host.appendChild(el('<p class="notice">No issue lines match these filters.</p>')); return; }
+
+    const shortPicked = rows.filter(r => r[ISS.PICKQ] < r[ISS.REQQ]).length;
+    const noStock = rows.filter(r => r[ISS.AVAILQ] <= 0).length;
+    host.appendChild(strip([
+      { label: 'Issue lines', value: nf(rows.length) },
+      { label: 'Issue tickets', value: nf(new Set(rows.map(r => S(r[ISS.IT]))).size) },
+      { label: 'Distinct parts', value: nf(new Set(rows.map(r => r[1])).size) },
+      { label: 'Picked short of requested', value: nf(shortPicked), flag: shortPicked > 0 },
+      { label: 'No stock available now', value: nf(noStock), flag: noStock > 0 },
+    ]));
+
+    const byStatus = {}, byRecip = {};
+    rows.forEach(r => {
+      const s = S(r[ISS.ST]) || '(no status)';
+      byStatus[s] = (byStatus[s] || 0) + 1;
+      const rc = S(r[ISS.RECIP]) || '(not recorded)';
+      byRecip[rc] = (byRecip[rc] || 0) + 1;
+    });
+    const top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, value]) => ({ label, value }));
+    host.appendChild(chartPair(
+      { title: 'Issue lines by status', hint: 'Click a bar to filter.',
+        rows: top(byStatus, 9),
+        opts: { aria: 'Issue lines by status',
+                pick: r => { pickValue(st, 'status', r.label === '(no status)' ? '' : r.label); render(); } } },
+      { title: 'Issue lines by recipient', hint: 'Click a bar to filter.',
+        rows: top(byRecip, 9),
+        opts: { color: cvar('--s5'), padL: 150, aria: 'Issue lines by recipient',
+                pick: r => { pickValue(st, 'recip', r.label === '(not recorded)' ? '' : r.label); render(); } } }));
+
+    const qtyDot = r => `<span class="dot ${r[ISS.PICKQ] < r[ISS.REQQ] ? 'dot-warn' : 'dot-ok'}">${nf(r[ISS.PICKQ])}</span>`;
+
+    host.appendChild(block('Issuing detail', 'One row per issue line: Material Request → Pick Ticket → Issue Ticket, matching the SiteSense Issuing Dashboard.',
+      dataTable([
+        { label: 'Part', value: r => matName(r[1]),
+          cell: r => `<span class="clip clip-wide" title="${esc(matName(r[1]))}">${esc(matName(r[1]))}</span>`
+                   + (matDesc(r[1]) ? `<span class="sub clip clip-wide" title="${esc(matDesc(r[1]))}">${esc(matDesc(r[1]))}</span>` : '') },
+        { label: 'Status', value: r => S(r[ISS.ST]) },
+        { label: 'Issue Ticket', value: r => S(r[ISS.IT]),
+          cell: r => `<span class="clip" title="${esc(S(r[ISS.IT]))}">${esc(S(r[ISS.IT]))}</span>` },
+        { label: 'Requested by', value: r => S(r[ISS.REQBY]) },
+        { label: 'Requested qty', value: r => r[ISS.REQQ], num: true, cell: r => nf(r[ISS.REQQ]) },
+        { label: 'Picked qty', value: r => r[ISS.PICKQ], num: true, cell: qtyDot },
+        { label: 'Issued qty', value: r => r[ISS.ISSQ], num: true, cell: r => nf(r[ISS.ISSQ]) },
+        { label: 'Available qty', value: r => r[ISS.AVAILQ], num: true, cell: r => nf(r[ISS.AVAILQ]) },
+        { label: 'Recipient', value: r => S(r[ISS.RECIP]) },
+        { label: 'Pick location', value: r => S(r[ISS.LOC]),
+          cell: r => `<span class="clip" title="${esc(S(r[ISS.LOC]))}">${esc(S(r[ISS.LOC]) || '—')}</span>` },
+        { label: 'Date raised', value: r => S(r[ISS.DATE]) },
+        { label: 'Project', value: r => PROJ[r[0]],
+          cell: r => `<span class="clip" title="${esc(PROJ[r[0]])}">${esc(PROJ[r[0]])}</span>` },
+      ], rows, { sortAt: 10, sortDir: -1, exportName: 'Issuing' })));
+
+    host.appendChild(el(`<p class="notice" style="margin-top:14px">
+      <strong>"Date raised" is the Issue Ticket's own created date, not SiteSense's "Approved Date".</strong>
+      SiteSense's native Issuing report shows a genuine Approved Date, but no field on this GraphQL API
+      matches it for the same ticket - every timestamp on the Issue Ticket, its Pick Ticket and its
+      Material Request was checked against the exact value the native report displayed. Rather than
+      guess, this column uses the one date confirmed against the ticket itself.</p>`));
+  }
+  render();
+}
+
+// ================================================================ TABS: document ledgers
+const DOMAIN_EXPORT = {
+  materials_inventory: 'Materials_Documents',
+  track_trace: 'Track_and_Trace_Documents',
+  quality_compliance: 'Quality_Documents',
+};
+const LEDGER_TABS = {
+  materials_inventory: { title: 'Materials & Inventory',
+    lede: 'Purchase orders, receipts, deliveries and inventory audits at document level.' },
+  track_trace: { title: 'Track & Trace',
+    lede: 'Material requests, transfers, pick tickets and shipments, covering material movement and logistics.' },
+  quality_compliance: { title: 'Field Quality & Compliance',
+    lede: 'Field inspections and non-compliance tickets recorded directly in SiteSense.' },
+};
+
+function tabLedger(stage, domain) {
+  const keys = Object.keys(D.ledger_types).filter(k => D.ledger_types[k].domain === domain);
+  const state = {};
+  const allDocs = () => keys.flatMap(k => D.ledger_types[k].docs.map(d => ({ d, k })));
+
+  const passes = (x, skip) => {
+    const d = x.d;
+    if (!inScope(d[0])) return false;
+    if (skip !== 'doctype' && state.doctype && D.ledger_types[x.k].label !== state.doctype) return false;
+    if (skip !== 'status' && state.status && S(d[1]) !== state.status) return false;
+    if (skip !== 'month' && state.month && S(d[2]) !== state.month) return false;
+    if (skip !== 'q') {
+      const q = (state.q || '').toLowerCase();
+      if (q && !S(d[3]).toLowerCase().includes(q)) return false;
+    }
+    return true;
+  };
+  const optsFor = (key, get) => uniqSorted(allDocs().filter(x => passes(x, key)).map(get));
+
+  const rail = buildRail([
+    { key: 'q', type: 'search', label: 'Document', placeholder: 'Document number' },
+    { key: 'doctype', type: 'select', label: 'Document type', anyLabel: 'All types',
+      options: () => optsFor('doctype', x => D.ledger_types[x.k].label) },
+    { key: 'status', type: 'select', label: 'Status', anyLabel: 'Any status',
+      options: () => optsFor('status', x => S(x.d[1])) },
+    { key: 'month', type: 'select', label: 'Month created', anyLabel: 'All months',
+      options: () => optsFor('month', x => S(x.d[2])) },
+  ], state, () => render());
+  stage.appendChild(rail);
+  const host = el('<div></div>');
+  stage.appendChild(host);
+
+  const LABELS = { q: 'Document', doctype: 'Type', status: 'Status', month: 'Month' };
+
+  function render() {
+    rail.sync();
+    const pass = (d, k) => passes({ d, k });
+
+    host.textContent = '';
+    const chips = activeChips(state, LABELS, render);
+    if (chips) host.appendChild(chips);
+    const perType = keys.map(k => ({
+      k, label: D.ledger_types[k].label,
+      docs: D.ledger_types[k].docs.filter(d => pass(d, k)),
+    }));
+    const total = perType.reduce((a, t) => a + t.docs.length, 0);
+
+    if (!total) {
+      host.appendChild(el(`<p class="notice">No documents match these filters. If no projects are
+        excluded, this module may simply not be in active use in SiteSense. Check whether it is
+        tracked elsewhere, for example in Procore.</p>`));
+      return;
+    }
+
+    host.appendChild(strip(perType.map(t => ({ label: t.label, value: nf(t.docs.length) }))));
+
+    const withData = perType.filter(t => t.docs.length);
+    const months = [...new Set(withData.flatMap(t => t.docs.map(d => S(d[2])).filter(Boolean)))].sort();
+    const series = withData.map(t => {
+      const c = {};
+      t.docs.forEach(d => { const m = S(d[2]); if (m) c[m] = (c[m] || 0) + 1; });
+      return { label: t.label, values: months.map(m => c[m] || 0) };
+    });
+    host.appendChild(block('Documents created each month', 'Click a point to filter to that month.',
+      keyRow(series), lineChart(series, months, { aria: 'Documents per month',
+        pick: m => { pickValue(state, 'month', m); render(); } })));
+
+    const flat = withData.flatMap(t => t.docs.map(d => ({ d, type: t.label })));
+    const byProject = {}, byStatus = {};
+    flat.forEach(x => {
+      byProject[PROJ[x.d[0]]] = (byProject[PROJ[x.d[0]]] || 0) + 1;
+      byStatus[S(x.d[1])] = (byStatus[S(x.d[1])] || 0) + 1;
+    });
+    const top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, value]) => ({ label, value }));
+    host.appendChild(chartPair(
+      { title: 'Documents by project', hint: 'Click a bar to filter.',
+        rows: top(byProject, 9),
+        opts: { aria: 'Documents by project', pick: r => { pickProject(r.label); render(); } } },
+      { title: 'Documents by status', hint: 'Click a bar to filter.',
+        rows: top(byStatus, 9),
+        opts: { color: cvar('--s7'), padL: 150, aria: 'Documents by status',
+                pick: r => { pickValue(state, 'status', r.label); render(); } } }));
+
+    host.appendChild(block('Document register', null, dataTable([
+      { label: 'Document', value: x => S(x.d[3]), cell: x => `<span class="clip" title="${esc(S(x.d[3]))}">${esc(S(x.d[3]))}</span>` },
+      { label: 'Type', value: x => x.type },
+      { label: 'Status', value: x => S(x.d[1]) },
+      { label: 'Project', value: x => PROJ[x.d[0]], cell: x => `<span class="clip" title="${esc(PROJ[x.d[0]])}">${esc(PROJ[x.d[0]])}</span>` },
+      { label: 'Updated', value: x => S(x.d[4]) },
+    ], flat, { sortAt: 4, exportName: DOMAIN_EXPORT[domain] })));
+  }
+  render();
+}
+
+// ================================================================ TAB: Regions (configuration)
+function tabRegions(stage) {
+  const host = el('<div></div>');
+  stage.appendChild(host);
+  let dirty = false;
+
+  function render() {
+    host.textContent = '';
+
+    const counts = { East: 0, West: 0, Unassigned: 0 };
+    D.projects.forEach((p, i) => { counts[regionOf(i) || 'Unassigned']++; });
+    host.appendChild(strip([
+      { label: 'East coast', value: nf(counts.East) },
+      { label: 'West coast', value: nf(counts.West) },
+      { label: 'Unassigned', value: nf(counts.Unassigned), flag: counts.Unassigned > 0 },
+      { label: 'Projects', value: nf(D.projects.length) },
+    ]));
+
+    const bar = el('<div class="rail"></div>');
+    const suggest = el('<button class="btn">Fill blanks from project codes</button>');
+    suggest.title = 'Sets any unassigned project whose name carries an AU-WA or AU-QLD style code';
+    suggest.onclick = () => {
+      let n = 0;
+      D.projects.forEach((p, i) => {
+        if (!regionOf(i)) { const g = suggestRegion(p.name); if (g) { regionByProject[i] = g; n++; } }
+      });
+      if (n) { dirty = true; saveRegions(); }
+      render();
+    };
+    const clear = el('<button class="btn btn-quiet">Clear all assignments</button>');
+    clear.onclick = () => {
+      D.projects.forEach((p, i) => { regionByProject[i] = ''; });
+      dirty = true; saveRegions(); render();
+    };
+    const dl = el('<button class="btn">Download regions.json</button>');
+    dl.onclick = async () => {
+      const out = {};
+      D.projects.forEach((p, i) => { out[String(p.id)] = regionOf(i); });
+      const text = JSON.stringify(out, null, 2);
+      const hosted = typeof window.claude !== 'undefined' && window.claude && typeof window.claude.use === 'function';
+      const was = dl.textContent;
+      if (hosted) {
+        const downloads = await window.claude.use('downloads');
+        if (!downloads) { dl.textContent = 'Saving unavailable here'; }
+        else {
+          try { await downloads.save({ filename: 'regions.json', data: text }); dl.textContent = 'Saved'; }
+          catch (err) { dl.textContent = err && err.code === 'declined' ? 'Cancelled' : 'Save failed'; }
+        }
+        setTimeout(() => { dl.textContent = was; }, 2400);
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      a.download = 'regions.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    bar.appendChild(suggest);
+    bar.appendChild(clear);
+    bar.appendChild(el('<div class="spacer"></div>'));
+    bar.appendChild(dl);
+    host.appendChild(bar);
+
+    host.appendChild(el(`<div class="notes">
+      <p class="notice"><strong>Region is an RSGx overlay, not a SiteSense field.</strong>
+      SiteSense holds no east or west attribute, so this mapping is maintained here and applied to
+      every tab through the <em>Region</em> filter.</p>
+      <p class="notice"><strong>${dirty ? 'You have unsaved changes for future refreshes.' : 'To keep changes permanently.'}</strong>
+      Edits apply immediately and are remembered in this browser. To survive the three-hourly refresh,
+      click <em>Download regions.json</em> and save it into the dashboard folder, replacing the file
+      there. The next refresh reads it and bakes the regions in for everyone.</p>
+    </div>`));
+
+    const rows = D.projects.map((p, i) => ({ p, i }));
+    host.appendChild(block('Project regions', 'Set each project to East or West. Blank means unassigned.',
+      dataTable([
+        { label: 'Project', value: x => x.p.name,
+          cell: x => `<span class="clip clip-wide" title="${esc(x.p.name)}">${esc(x.p.name)}</span>` },
+        { label: 'SiteSense ID', value: x => x.p.id, num: true },
+        { label: 'Suggested', value: x => suggestRegion(x.p.name) || '',
+          cell: x => { const g = suggestRegion(x.p.name);
+                       return g ? esc(g) : '<span class="zero">no code</span>'; } },
+        { label: 'Region', value: x => regionOf(x.i) || '',
+          cell: x => `<select data-i="${x.i}" class="region-pick">
+            <option value=""${regionOf(x.i) ? '' : ' selected'}>Unassigned</option>
+            ${REGION_CHOICES.map(r => `<option value="${r}"${regionOf(x.i) === r ? ' selected' : ''}>${r}</option>`).join('')}
+          </select>` },
+      ], rows, { sortAt: 0, sortDir: 1, pageSize: 40, exportName: 'Project_Regions',
+        onRepaint: sc => sc.querySelectorAll('select.region-pick').forEach(sel => {
+          sel.onchange = () => {
+            regionByProject[+sel.dataset.i] = sel.value;
+            dirty = true;
+            saveRegions();
+            render();
+          };
+        }) })));
+  }
+  render();
+}
+
+// ================================================================ shell
+const TABS = [
+  { id: 'overview', title: 'Overview',
+    lede: 'Where everything stands across the portfolio: purchase orders, receipts, transfers, inventory and tracked parts, broken down by region and by project.',
+    mount: tabOverview },
+  { id: 'inventory', title: 'Inventory',
+    lede: 'Live stock position by material: what is required, ordered, received, issued and still available.',
+    mount: tabInventory },
+  { id: 'storage', title: 'Storage',
+    lede: 'Where stock physically sits, by location and condition, down to each material.',
+    mount: tabStorage },
+  { id: 'receipts', title: 'Receipts',
+    lede: 'Every receipt line: what arrived, against which purchase order and shipment, in what condition, and where it was put away.',
+    mount: tabReceipts },
+  { id: 'fim', title: 'FIM',
+    lede: 'Free issue material: client supplied stock loaded into SiteSense by hand rather than bought through Procore, tracked by container and work package.',
+    mount: tabFim },
+  { id: 'issuing', title: 'Issuing',
+    lede: 'Material issued out of store: requested, picked, issued and to whom, following Material Request → Pick Ticket → Issue Ticket.',
+    mount: tabIssuing },
+  { id: 'transfers', title: 'Transfers',
+    lede: 'Material movements between locations, line by line.',
+    mount: tabTransfers },
+  { id: 'assets', title: 'Asset Tracking',
+    lede: 'Ordered against received for every part, with cost code, purchase order and receipt references.',
+    mount: tabAssets },
+  { id: 'materials_inventory', title: 'Materials & Inventory', lede: LEDGER_TABS.materials_inventory.lede,
+    mount: s => tabLedger(s, 'materials_inventory') },
+  { id: 'track_trace', title: 'Track & Trace', lede: LEDGER_TABS.track_trace.lede,
+    mount: s => tabLedger(s, 'track_trace') },
+  { id: 'quality_compliance', title: 'Quality & Compliance', lede: LEDGER_TABS.quality_compliance.lede,
+    mount: s => tabLedger(s, 'quality_compliance') },
+  { id: 'regions', title: 'Regions', config: true,
+    lede: 'Assign each project to the east or west coast. This mapping is maintained here, not in SiteSense, and drives the Region filter on every other tab.',
+    mount: tabRegions },
+];
+
+function openTab(id) {
+  const tab = TABS.find(t => t.id === id);
+  const tabsEl = document.getElementById('tabstrip');
+  tabsEl.querySelectorAll('button').forEach(b =>
+    b.setAttribute('aria-selected', String(b.dataset.id === id)));
+  const stage = document.getElementById('stage');
+  stage.textContent = '';
+  stage.appendChild(el(`<p class="lede">${esc(tab.lede)}</p>`));
+  tab.mount(stage);
+  location.hash = id;
+}
+
+// ---------------------------------------------------------------- refresh button
+/* Talks to refresh_server.py on localhost so the dashboard can pull fresh
+   SiteSense data on demand instead of waiting for the scheduled run. That
+   helper is a separate always-on process (see the "RSGx PMO Dashboard
+   Refresh Server" scheduled task); if it is not running, the calls below
+   simply fail to connect and the button says so, rather than doing nothing
+   silently. On the hosted artifact link this will always fail to connect,
+   because the viewer's browser has no route to someone else's PC - that is
+   expected, not a bug.
+
+   Opened straight off disk (file://, the local workflow via refresh_server.py)
+   there is no same-origin server to ask, so this targets that fixed local
+   port. Served over http(s) instead - the Railway deployment, or any future
+   local dev server - the page and the API live at the same origin, so a
+   relative path is both correct and portable across whatever host/port that
+   turns out to be. */
+const REFRESH_BASE = location.protocol === 'file:' ? 'http://127.0.0.1:8799' : '';
+const REFRESH_POLL_MS = 3000;
+let refreshPollTimer = null;
+
+function setRefreshStatus(mode, html) {
+  const box = document.getElementById('refreshStatus');
+  box.className = 'refresh-status' + (mode ? ' is-' + mode : '');
+  box.innerHTML = html || '';
+}
+
+function refreshElapsed(startedAt) {
+  const s = Math.max(0, Math.round(Date.now() / 1000 - startedAt));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+async function pollRefreshStatus() {
+  const btn = document.getElementById('refreshBtn');
+  clearTimeout(refreshPollTimer);
+  let st;
+  try {
+    const res = await fetch(REFRESH_BASE + '/status');
+    st = await res.json();
+  } catch (err) {
+    btn.disabled = false;
+    setRefreshStatus('error', '<span class="dot dot-alert"></span>Lost contact with the refresh helper');
+    return;
+  }
+  if (st.phase === 'running') {
+    btn.disabled = true;
+    setRefreshStatus('running', `<span class="dot dot-warn"></span>Refreshing... ${refreshElapsed(st.startedAt)}`);
+    refreshPollTimer = setTimeout(pollRefreshStatus, REFRESH_POLL_MS);
+  } else if (st.phase === 'done') {
+    setRefreshStatus('done', '<span class="dot dot-ok"></span>Refreshed. Reloading...');
+    setTimeout(() => location.reload(), 900);
+  } else if (st.phase === 'error') {
+    btn.disabled = false;
+    const lastLine = (st.tail && st.tail.length) ? esc(st.tail[st.tail.length - 1]) : '';
+    setRefreshStatus('error', `<span class="dot dot-alert"></span>Refresh failed${lastLine ? ': ' + lastLine : ''}`);
+    console.error('fetch_data.py failed. Full output:', (st.tail || []).join('\n'));
+  } else {
+    btn.disabled = false;
+    setRefreshStatus('', '');
+  }
+}
+
+async function startRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  setRefreshStatus('running', '<span class="dot dot-warn"></span>Starting...');
+  try {
+    const res = await fetch(REFRESH_BASE + '/refresh', { method: 'POST' });
+    await res.json();
+    pollRefreshStatus();
+  } catch (err) {
+    btn.disabled = false;
+    setRefreshStatus('error',
+      '<span class="dot dot-alert"></span>Can\'t reach the refresh helper on this PC. '
+      + 'It may not be running, or this page is open on someone else\'s machine.');
+  }
+}
+
+function initRefreshButton() {
+  const btn = document.getElementById('refreshBtn');
+  btn.addEventListener('click', startRefresh);
+  // Silent probe: if a refresh was already under way before this page loaded
+  // (the tab was reloaded mid-run), resume tracking it. Say nothing if the
+  // helper simply is not running yet - that is the ordinary idle state.
+  fetch(REFRESH_BASE + '/status').then(res => res.json()).then(st => {
+    if (st.phase === 'running') pollRefreshStatus();
+  }).catch(() => { /* not running; stay quiet until the user clicks */ });
+}
+
+function boot() {
+  const gen = new Date(D.generated_at);
+  document.getElementById('stamp').textContent =
+    `Data pulled ${gen.toLocaleString('en-AU', {dateStyle: 'medium', timeStyle: 'short'})} `
+    + `· ${PROJ.length} projects · ${nf(D.materials.length)} materials`;
+
+  const tabsEl = document.getElementById('tabstrip');
+  TABS.forEach(t => {
+    const b = el(`<button role="tab" data-id="${t.id}" aria-selected="false"${t.config ? ' data-config="true"' : ''}>${esc(t.title)}</button>`);
+    b.onclick = () => openTab(t.id);
+    tabsEl.appendChild(b);
+  });
+
+  const wanted = location.hash.replace('#', '');
+  openTab(TABS.some(t => t.id === wanted) ? wanted : TABS[0].id);
+}
+
+boot();
+initRefreshButton();
+</script>
+</body>
+</html>
