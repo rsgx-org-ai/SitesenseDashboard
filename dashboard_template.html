@@ -228,8 +228,8 @@
   /* Equal columns keep both charts at the same scale factor. An uneven split
      shrinks the narrower chart's text below a readable size once the SVG is
      scaled down to fit. */
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
-  @media (max-width: 940px) { .split { grid-template-columns: 1fr; } }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 26px; }
+  @media (max-width: 940px) { .split { grid-template-columns: minmax(0, 1fr); } }
 
   .notice {
     padding: 12px 14px; border: 1px solid var(--rule); border-radius: 8px;
@@ -254,7 +254,10 @@
   details.notice > div { padding: 0 14px 12px 30px; }
 
   /* ---------- charts ---------- */
-  svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+  /* Drawn at the host's exact pixel width (see responsiveChart), so shown 1:1,
+     never stretched - stretching is what scaled chart text away from the page's. */
+  .chart-host { width: 100%; min-width: 0; }
+  svg.chart { display: block; max-width: 100%; overflow: visible; }
   .tick { fill: var(--ink-3); font-size: 10px; }
   .grid { stroke: var(--rule); }
   /* Whole-row hit target sits above the mark so the label and value are clickable
@@ -698,20 +701,68 @@ function svgNode(markup) {
   return document.importNode(doc.documentElement, true);
 }
 
+/* Charts are drawn at the real pixel width of their box and redrawn when that
+   box resizes, rather than drawn once at a fixed size and stretched to fit.
+   Stretching scaled the chart's text and bar thickness with the box width, so
+   charts ballooned on wide screens, shrank on narrow ones, and cancelled out
+   browser zoom while the rest of the page zoomed normally. Drawn 1:1, labels
+   stay at the page's own text size and only the bar lengths and spacing adapt.
+   `height` is known up front so the box reserves its space before the first
+   draw and nothing below it jumps. */
+function responsiveChart(height, draw) {
+  const host = el('<div class="chart-host"></div>');
+  host.style.minHeight = height + 'px';
+  let lastW = 0, attached = false;
+  // Measures synchronously rather than waiting for an animation frame, which
+  // never comes in a background tab or while printing - the chart would sit
+  // empty until the tab was shown.
+  const tryDraw = () => {
+    if (!host.isConnected) return false;
+    attached = true;
+    const w = Math.floor(host.clientWidth);
+    if (w >= 120 && w !== lastW) { lastW = w; host.replaceChildren(draw(w)); }
+    return true;
+  };
+  // First draw: the host is built before it is put on the page, so poll briefly
+  // until it is attached and has a width.
+  let tries = 0;
+  (function firstDraw() { if (!tryDraw() && tries++ < 100) setTimeout(firstDraw, 20); })();
+  // ResizeObserver catches the box changing for any reason (a column collapsing
+  // at the mobile breakpoint, the rail wrapping); the window resize event backs
+  // it up, since observers pause while a page is not being rendered.
+  const onChange = () => {
+    // Only a host that was on the page and has since been removed (the tab
+    // re-rendered) is finished with; not-yet-attached is normal early on.
+    if (!host.isConnected) {
+      if (attached) { ro.disconnect(); window.removeEventListener('resize', onChange); }
+      return;
+    }
+    tryDraw();
+  };
+  const ro = new ResizeObserver(onChange);
+  ro.observe(host);
+  window.addEventListener('resize', onChange);
+  return host;
+}
+
 function barChart(rows, opts = {}) {
   if (!rows.length) return el('<p class="empty">Nothing to plot for this selection.</p>');
-  // padR must fit the longest value label, which can be a full currency figure.
-  const W = 560, padL = opts.padL || 200, padT = 4;
-  const padR = Math.max(60, 8 + 7 * Math.max(...rows.map(r => nf(r.value).length)));
-
   /* `slots` is the row count shared by both charts in a pair, so two charts
      side by side occupy the same height instead of one towering over the other.
      Bars grow to use the reserved space, up to a sane maximum, and the group is
      centred so a short chart reads as deliberate rather than as a rendering gap. */
   const slots = Math.max(rows.length, opts.slots || 0);
+  const H = 8 + slots * 29;
+  return responsiveChart(H, W => drawBarChart(rows, opts, W, slots, H));
+}
+
+function drawBarChart(rows, opts, W, slots, H) {
+  // The label column gives up space on a narrow box rather than squeezing bars to nothing.
+  const padL = Math.min(opts.padL || 200, Math.max(110, Math.round(W * 0.4))), padT = 4;
+  // padR must fit the longest value label, which can be a full currency figure.
+  const padR = Math.max(60, 8 + 7 * Math.max(...rows.map(r => nf(r.value).length)));
   const gap = 9;
   const bar = Math.min(34, Math.max(16, Math.round((slots * 29) / rows.length) - gap));
-  const H = padT * 2 + slots * 29;
   const contentH = rows.length * (bar + gap);
   const originY = padT + Math.max(0, (H - padT * 2 - contentH) / 2);
   const max = Math.max(1, ...rows.map(r => Math.abs(r.value)));
@@ -760,7 +811,12 @@ function barChart(rows, opts = {}) {
 
 function lineChart(series, months, opts = {}) {
   if (!months.length) return el('<p class="empty">Nothing to plot for this selection.</p>');
-  const W = 820, H = 230, padL = 52, padR = 14, padT = 10, padB = 26;
+  const H = 240;
+  return responsiveChart(H, W => drawLineChart(series, months, opts, W, H));
+}
+
+function drawLineChart(series, months, opts, W, H) {
+  const padL = 52, padR = 14, padT = 10, padB = 26;
   const pw = W - padL - padR, ph = H - padT - padB;
   const max = Math.max(1, ...series.flatMap(s => s.values));
   const X = i => padL + (months.length > 1 ? (pw / (months.length - 1)) * i : 0);
@@ -772,7 +828,8 @@ function lineChart(series, months, opts = {}) {
     parts += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" class="grid"></line>`
           +  `<text x="${padL - 8}" y="${y + 3.5}" text-anchor="end" class="tick">${nf(Math.round(max * (1 - g / 4)))}</text>`;
   }
-  const every = Math.max(1, Math.ceil(months.length / 9));
+  // Month labels need ~64px each at the page's text size; fit as many as the width allows.
+  const every = Math.max(1, Math.ceil(months.length / Math.max(2, Math.floor(pw / 64))));
   months.forEach((m, i) => {
     if (i % every === 0 || i === months.length - 1) {
       parts += `<text x="${X(i)}" y="${H - 7}" text-anchor="middle" class="tick">${esc(m)}</text>`;
