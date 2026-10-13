@@ -120,6 +120,7 @@
   /* The configuration tab is pushed right and set apart: it changes settings
      rather than showing data, so it should not read as another view. */
   .tabstrip button[data-config="true"] { margin-left: auto; color: var(--ink-3); }
+  .tabstrip button[data-config="true"] ~ button[data-config="true"] { margin-left: 0; }
   .tabstrip button[data-config="true"]::before { content: "⚙"; margin-right: 6px; font-size: 12px; }
 
   select.region-pick, input.deliv-pick {
@@ -172,6 +173,64 @@
   .btn:hover { border-color: var(--ink-3); }
   .btn-quiet { background: none; border-color: transparent; color: var(--ink-2); }
   .btn-quiet:hover { color: var(--ink); border-color: var(--rule-strong); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: oklch(99% 0 0); }
+  .btn-primary:hover { border-color: var(--accent); filter: brightness(1.06); }
+  .btn-danger { color: var(--alert); }
+  .btn-danger:hover { color: var(--alert); border-color: var(--alert); }
+
+  /* ---------- signed-in user, password dialog, toast (server only) ---------- */
+  .user-box { display: inline-flex; align-items: center; gap: 4px; padding-left: 10px;
+              margin-left: 2px; border-left: 1px solid var(--rule); }
+  .user-box form { margin: 0; }
+  .user-box .btn { padding: 5px 9px; min-height: 30px; font-size: var(--step-1); }
+  .user-name { font-size: var(--step-1); font-weight: 600; color: var(--ink); margin-right: 4px; }
+  .user-role { font-weight: 600; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
+               color: var(--ink-3); border: 1px solid var(--rule-strong); border-radius: 999px;
+               padding: 1px 6px; margin-left: 4px; }
+  .pw-dialog { border: 1px solid var(--rule-strong); border-radius: 10px; padding: 22px 22px 18px;
+               background: var(--surface); color: var(--ink); width: min(380px, calc(100vw - 32px)); }
+  .pw-dialog::backdrop { background: oklch(0% 0 0 / 0.35); }
+  .pw-dialog h3 { font-size: var(--step1); margin-bottom: 14px; }
+  .pw-dialog .field { margin-bottom: 12px; }
+  .pw-dialog .field input { max-width: none; width: 100%; }
+  .pw-dialog .hint { color: var(--ink-3); font-size: var(--step-1); margin: 0 0 8px; }
+  .pw-error { color: var(--alert); font-size: var(--step-1); min-height: 1.2em; margin: 0 0 8px; }
+  .pw-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .toast { position: fixed; z-index: 70; left: 50%; bottom: 22px; transform: translate(-50%, 12px);
+           opacity: 0; pointer-events: none; transition: opacity 160ms var(--ease), transform 160ms var(--ease);
+           background: var(--ink); color: var(--surface); padding: 8px 14px; border-radius: 7px;
+           font-size: var(--step0); max-width: calc(100vw - 32px); }
+  .toast.is-shown { opacity: 1; transform: translate(-50%, 0); }
+  .toast.is-error { background: var(--alert); color: oklch(99% 0 0); }
+
+  /* ---------- users tab ---------- */
+  .user-add .rail { margin-bottom: 10px; }
+  .nu-projects { margin-bottom: 4px; }
+  .nu-projects .hint, .user-edit .hint { color: var(--ink-3); font-size: var(--step-1); margin: 0 0 6px; }
+  .user-projects { border: 1px solid var(--rule); border-radius: 9px; background: var(--surface); }
+  .user-projects-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px;
+                       border-bottom: 1px solid var(--rule); }
+  .user-projects-bar input { font: var(--step0) system-ui, sans-serif; color: var(--ink); background: var(--surface);
+                             border: 1px solid var(--rule-strong); border-radius: 6px; padding: 5px 8px;
+                             min-width: 0; flex: 1 1 200px; }
+  .user-projects-bar .btn { padding: 4px 9px; min-height: 28px; font-size: var(--step-1); }
+  .user-projects-count { color: var(--ink-3); font-size: var(--step-1); margin-left: auto; }
+  .user-projects-list { max-height: 260px; overflow-y: auto; padding: 6px 6px 8px;
+                        display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 0 8px; }
+  .user-projects-list label { display: flex; gap: 8px; align-items: flex-start; padding: 5px 6px;
+                              border-radius: 5px; cursor: pointer; line-height: 1.35; font-size: var(--step0); }
+  .user-projects-list label:hover { background: var(--surface-sunk); }
+  .user-projects-list input { accent-color: var(--accent); margin-top: 2px; flex: none; }
+  .user-actions { white-space: nowrap; text-align: right; }
+  .user-list td:nth-child(3) .clip { max-width: 30ch; }
+  .user-actions .btn { padding: 4px 9px; min-height: 28px; font-size: var(--step-1); }
+  .user-edit td { background: var(--surface-sunk); }
+  .user-edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  .user-secret { max-width: none; margin-bottom: 20px; }
+  .user-secret code { display: inline-block; margin-top: 8px; padding: 6px 10px; border-radius: 6px;
+                      background: var(--surface); border: 1px solid var(--rule-strong);
+                      font: 600 var(--step1) ui-monospace, Consolas, monospace; letter-spacing: 0.03em;
+                      user-select: all; }
 
   /* project picker */
   .picker { position: relative; }
@@ -376,8 +435,27 @@
     <p class="stamp" id="stamp"></p>
     <span class="refresh-status" id="refreshStatus"></span>
     <button class="btn refresh-btn" id="refreshBtn" type="button" title="Pulls fresh data from SiteSense now, instead of waiting for the next scheduled run">Refresh data</button>
+    <span class="user-box" id="userBox" hidden></span>
   </div>
 </header>
+
+<dialog id="pwDialog" class="pw-dialog" aria-labelledby="pwTitle">
+  <form method="dialog" id="pwForm">
+    <h3 id="pwTitle">Change your password</h3>
+    <div class="field"><label for="pwCurrent">Current password</label>
+      <input id="pwCurrent" type="password" autocomplete="current-password" required></div>
+    <div class="field"><label for="pwNew">New password</label>
+      <input id="pwNew" type="password" autocomplete="new-password" minlength="10" required></div>
+    <div class="field"><label for="pwConfirm">Confirm new password</label>
+      <input id="pwConfirm" type="password" autocomplete="new-password" minlength="10" required></div>
+    <p class="hint">At least 10 characters. A few random words make a strong, memorable password.</p>
+    <p class="pw-error" id="pwError" role="alert"></p>
+    <div class="pw-actions">
+      <button type="button" class="btn btn-quiet" id="pwCancel">Cancel</button>
+      <button type="submit" class="btn btn-primary">Change password</button>
+    </div>
+  </form>
+</dialog>
 
 <nav class="tabstrip" id="tabstrip" role="tablist"></nav>
 <main id="stage"></main>
@@ -387,9 +465,46 @@
 /*__SITESENSE_DATA__*/
 
 const D = SITESENSE_DATA;
+
+/* Served by server.py (Railway) the page is told who is signed in; opened
+   straight off disk (the local workflow) there is no server and no accounts,
+   so everything behaves exactly as before and the local user has full rights. */
+const SERVER = typeof SERVER_CONTEXT !== 'undefined' ? SERVER_CONTEXT : null;
+const IS_ADMIN = !SERVER || SERVER.role === 'admin';
+
+// Same-origin JSON call to server.py. The custom header is what server.py's
+// CSRF check looks for; only sent in server mode, where it is same-origin.
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method, headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'dashboard' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let out = {};
+  try { out = await res.json(); } catch (e) { /* empty body */ }
+  if (!res.ok) throw new Error(out.error || `Request failed (${res.status})`);
+  return out;
+}
+
+function toast(message, kind) {
+  let box = document.getElementById('toast');
+  if (!box) { box = el('<div id="toast" class="toast" role="status"></div>'); document.body.appendChild(box); }
+  box.textContent = message;
+  box.className = 'toast is-shown' + (kind ? ' is-' + kind : '');
+  clearTimeout(box._t);
+  box._t = setTimeout(() => { box.className = 'toast'; }, 3200);
+}
+
 const STR = D.strings;
 const S = i => STR[i] || '';
 const PROJ = D.projects.map(p => p.name);
+
+// What to say when a whole tab has no rows. Locally that usually means the pull
+// predates the feature; on the server a viewer's projects may simply have none.
+function emptyNotice(what) {
+  if (!SERVER) return el(`<p class="notice">No ${what} in this dataset. Re-run <code>fetch_data.py</code> to pull it.</p>`);
+  const scope = !IS_ADMIN ? (PROJ.length === 1 ? 'your project' : 'any of your projects') : 'any project';
+  return el(`<p class="notice">No ${what} recorded in SiteSense for ${scope}.</p>`);
+}
 
 // materials: [nameIdx, descIdx, uomIdx, typeIdx, guidIdx]
 const matName = m => S(D.materials[m][0]);
@@ -408,6 +523,9 @@ const REGION_CHOICES = ['East', 'West'];
 
 const regionByProject = (() => {
   const map = D.projects.map(p => p.region || '');
+  // On the server the regions in the page are already the shared, current
+  // ones; a browser's own saved copy would only ever be stale there.
+  if (SERVER) return map;
   try {
     const saved = JSON.parse(localStorage.getItem(REGION_KEY) || '{}');
     D.projects.forEach((p, i) => {
@@ -421,6 +539,11 @@ const regionOf = i => regionByProject[i] || '';
 function saveRegions() {
   const out = {};
   D.projects.forEach((p, i) => { out[String(p.id)] = regionOf(i); });
+  if (SERVER) {
+    api('PUT', '/api/regions', out).then(() => toast('Regions saved for everyone', 'ok'))
+      .catch(err => toast('Could not save regions: ' + err.message, 'error'));
+    return true;
+  }
   try { localStorage.setItem(REGION_KEY, JSON.stringify(out)); return true; }
   catch (e) { return false; }
 }
@@ -448,6 +571,7 @@ const DELIVERY_FIELDS = ['estimated', 'promised'];
 const deliveryDates = (() => {
   const map = {};
   Object.entries(D.delivery_dates || {}).forEach(([guid, v]) => { map[guid] = { ...v }; });
+  if (SERVER) return map;   // shared and current on the server; see regionByProject
   try {
     const saved = JSON.parse(localStorage.getItem(DELIVERY_KEY) || '{}');
     Object.entries(saved).forEach(([guid, v]) => { map[guid] = { ...(map[guid] || {}), ...v }; });
@@ -460,8 +584,15 @@ function setDeliveryDate(m, field, value) {
   const cur = { ...(deliveryDates[g] || {}) };
   if (value) cur[field] = value; else delete cur[field];
   if (Object.keys(cur).length) deliveryDates[g] = cur; else delete deliveryDates[g];
+  // On the server each edit is saved straight away, for everyone.
+  if (SERVER) {
+    api('PUT', '/api/delivery-dates', { guid: g, field, value: value || '' })
+      .then(() => toast('Delivery date saved for everyone', 'ok'))
+      .catch(err => toast('Could not save: ' + err.message, 'error'));
+  }
 }
 function saveDeliveryDates() {
+  if (SERVER) return true;   // already saved per edit in setDeliveryDate
   try { localStorage.setItem(DELIVERY_KEY, JSON.stringify(deliveryDates)); return true; }
   catch (e) { return false; }
 }
@@ -1467,8 +1598,10 @@ function tabInventory(stage) {
     const dlBar = el('<div class="rail" style="margin-bottom:14px"></div>');
     dlBar.appendChild(el(`<span class="hint" style="align-self:center; margin:0">
       Estimated Delivery Date follows the PO created date (as SiteSense's Orders page shows it) unless
-      overridden here; Promised Delivery Date is entered here only - see the notice below the table.</span>`));
-    dlBar.appendChild(el('<div class="spacer"></div>'));
+      overridden here; Promised Delivery Date is entered here only - see the notice below the table.
+      ${!SERVER ? '' : IS_ADMIN ? 'Your edits save for everyone straight away.' : 'Only an admin can change these dates.'}</span>`));
+    // On the server dates are saved for everyone per edit, so there is nothing to download.
+    if (!SERVER) dlBar.appendChild(el('<div class="spacer"></div>'));
     const dl = el('<button class="btn btn-quiet">Download delivery_dates.json</button>');
     dl.onclick = async () => {
       const text = JSON.stringify(deliveryDates, null, 2);
@@ -1490,7 +1623,7 @@ function tabInventory(stage) {
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     };
-    dlBar.appendChild(dl);
+    if (!SERVER) dlBar.appendChild(dl);
     host.appendChild(dlBar);
 
     const byType = {}, byProject = {};
@@ -1542,10 +1675,10 @@ function tabInventory(stage) {
             const title = manual ? 'Entered by hand on this dashboard'
               : shown ? 'From the PO created date, as SiteSense’s Orders page shows it. Pick a date to override.'
               : 'No PO linked to this stock line';
-            return `<input type="date" class="deliv-pick${manual ? '' : ' deliv-default'}" data-m="${r[1]}" data-field="estimated" value="${shown}" title="${title}">`;
+            return `<input type="date" class="deliv-pick${manual ? '' : ' deliv-default'}" data-m="${r[1]}" data-field="estimated" value="${shown}" title="${title}"${IS_ADMIN ? '' : ' disabled'}>`;
           } },
         { label: 'Promised delivery date', value: r => deliveryDateOf(r[1], 'promised'),
-          cell: r => `<input type="date" class="deliv-pick" data-m="${r[1]}" data-field="promised" value="${deliveryDateOf(r[1], 'promised')}">` },
+          cell: r => `<input type="date" class="deliv-pick" data-m="${r[1]}" data-field="promised" value="${deliveryDateOf(r[1], 'promised')}"${IS_ADMIN ? '' : ' disabled'}>` },
         { label: 'Location received into', value: r => receivedLoc(r[0], r[1]),
           cell: r => { const v = receivedLoc(r[0], r[1]); return v ? `<span class="clip" title="${esc(v)}">${esc(v)}</span>` : '<span class="zero">—</span>'; } },
         { label: 'Checked by', value: r => receivedBy(r[0], r[1]),
@@ -1560,9 +1693,9 @@ function tabInventory(stage) {
       SiteSense's Orders page shows Estimated Delivery Date equal to the PO's created date on every PO
       checked, and the API exposes no separate field for it, so the dashed dates here come from the most
       recent PO on each stock line. Pick a date to override one (it then shows solid). Promised Delivery
-      Date has no source in the API and is blank until entered. Edits are remembered in this browser; to
-      survive the next refresh, click <em>Download delivery_dates.json</em> above and save it into the
-      dashboard folder, replacing the file there.</p>`));
+      Date has no source in the API and is blank until entered. ${SERVER
+        ? 'Dates are shared: an admin\'s edit shows for everyone on their next page load.'
+        : 'Edits are remembered in this browser; to survive the next refresh, click <em>Download delivery_dates.json</em> above and save it into the dashboard folder, replacing the file there.'}</p>`));
   }
   render();
 }
@@ -1731,8 +1864,7 @@ function tabFim(stage) {
     if (chips) host.appendChild(chips);
 
     if (!DATA.length) {
-      host.appendChild(el(`<p class="notice">No free issue material in this dataset. Re-run
-        <code>fetch_data.py</code> to pull it.</p>`));
+      host.appendChild(emptyNotice('free issue material'));
       return;
     }
     if (!rows.length) { host.appendChild(el('<p class="notice">No FIM matches these filters.</p>')); return; }
@@ -2149,8 +2281,7 @@ function tabReceipts(stage) {
     const chips = activeChips(st, LABELS, render);
     if (chips) host.appendChild(chips);
     if (!DATA.length) {
-      host.appendChild(el(`<p class="notice">No receipt detail in this dataset. Re-run
-        <code>fetch_data.py</code> to pull it.</p>`));
+      host.appendChild(emptyNotice('receipt detail'));
       return;
     }
     if (!rows.length) { host.appendChild(el('<p class="notice">No receipt lines match these filters.</p>')); return; }
@@ -2294,8 +2425,7 @@ function tabIssuing(stage) {
     const chips = activeChips(st, LABELS, render);
     if (chips) host.appendChild(chips);
     if (!DATA.length) {
-      host.appendChild(el(`<p class="notice">No issuing detail in this dataset. Re-run
-        <code>fetch_data.py</code> to pull it.</p>`));
+      host.appendChild(emptyNotice('issuing detail'));
       return;
     }
     if (!rows.length) { host.appendChild(el('<p class="notice">No issue lines match these filters.</p>')); return; }
@@ -2530,17 +2660,20 @@ function tabRegions(stage) {
     bar.appendChild(suggest);
     bar.appendChild(clear);
     bar.appendChild(el('<div class="spacer"></div>'));
-    bar.appendChild(dl);
+    if (!SERVER) bar.appendChild(dl);   // on the server every change is already saved for everyone
     host.appendChild(bar);
 
     host.appendChild(el(`<div class="notes">
       <p class="notice"><strong>Region is an RSGx overlay, not a SiteSense field.</strong>
       SiteSense holds no east or west attribute, so this mapping is maintained here and applied to
       every tab through the <em>Region</em> filter.</p>
-      <p class="notice"><strong>${dirty ? 'You have unsaved changes for future refreshes.' : 'To keep changes permanently.'}</strong>
-      Edits apply immediately and are remembered in this browser. To survive the three-hourly refresh,
-      click <em>Download regions.json</em> and save it into the dashboard folder, replacing the file
-      there. The next refresh reads it and bakes the regions in for everyone.</p>
+      ${SERVER
+        ? `<p class="notice"><strong>Changes are shared.</strong> Each change is saved straight away and
+           applies for everyone on their next page load, and survives refreshes and redeploys.</p>`
+        : `<p class="notice"><strong>${dirty ? 'You have unsaved changes for future refreshes.' : 'To keep changes permanently.'}</strong>
+           Edits apply immediately and are remembered in this browser. To survive the three-hourly refresh,
+           click <em>Download regions.json</em> and save it into the dashboard folder, replacing the file
+           there. The next refresh reads it and bakes the regions in for everyone.</p>`}
     </div>`));
 
     const rows = D.projects.map((p, i) => ({ p, i }));
@@ -2568,6 +2701,186 @@ function tabRegions(stage) {
         }) })));
   }
   render();
+}
+
+// ================================================================ TAB: Users (admin, server only)
+// A strong temporary password: 4 groups of 4 from an unambiguous alphabet.
+function makeTempPassword() {
+  const alphabet = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const chars = [...bytes].map(b => alphabet[b % alphabet.length]).join('');
+  return chars.match(/.{4}/g).join('-');
+}
+
+function tabUsers(stage) {
+  const host = el('<div></div>');
+  stage.appendChild(host);
+  let users = [], catalog = [], editing = null, notice = null;
+  const nameOf = id => (catalog.find(p => p.id === id) || {}).name || `Project ${id}`;
+
+  /* A checkbox list of projects with a quick filter, used both when adding a
+     user and when changing someone's projects. */
+  function projectPicker(selected) {
+    const chosen = new Set(selected);
+    const wrap = el(`<div class="user-projects">
+      <div class="user-projects-bar">
+        <input type="search" placeholder="Filter projects" aria-label="Filter projects">
+        <button type="button" class="btn btn-quiet" data-act="all">Select shown</button>
+        <button type="button" class="btn btn-quiet" data-act="none">Clear</button>
+        <span class="user-projects-count"></span>
+      </div>
+      <div class="user-projects-list"></div></div>`);
+    const list = wrap.querySelector('.user-projects-list');
+    const filter = wrap.querySelector('input');
+    const count = wrap.querySelector('.user-projects-count');
+    const paint = () => {
+      const q = filter.value.trim().toLowerCase();
+      const shown = catalog.filter(p => !q || p.name.toLowerCase().includes(q) || String(p.id).includes(q));
+      list.innerHTML = shown.map(p => `<label><input type="checkbox" value="${p.id}"${chosen.has(p.id) ? ' checked' : ''}>
+        <span>${esc(p.name)}</span></label>`).join('') || '<p class="empty">No projects match.</p>';
+      count.textContent = `${chosen.size} selected`;
+      list.querySelectorAll('input').forEach(cb => cb.onchange = () => {
+        cb.checked ? chosen.add(+cb.value) : chosen.delete(+cb.value);
+        count.textContent = `${chosen.size} selected`;
+      });
+    };
+    filter.oninput = paint;
+    wrap.querySelector('[data-act="all"]').onclick = () => {
+      list.querySelectorAll('input').forEach(cb => chosen.add(+cb.value)); paint();
+    };
+    wrap.querySelector('[data-act="none"]').onclick = () => { chosen.clear(); paint(); };
+    paint();
+    wrap.value = () => [...chosen];
+    return wrap;
+  }
+
+  async function load() {
+    try {
+      const r = await api('GET', '/api/users');
+      users = r.users; catalog = r.projects;
+    } catch (err) { host.innerHTML = `<p class="notice">Could not load users: ${esc(err.message)}</p>`; return; }
+    render();
+  }
+
+  async function run(fn, success) {
+    try { await fn(); if (success) toast(success, 'ok'); await load(); return true; }
+    catch (err) { toast(err.message, 'error'); render(); return false; }
+  }
+
+  function render() {
+    host.textContent = '';
+    const admins = users.filter(u => u.role === 'admin').length;
+    host.appendChild(strip([
+      { label: 'Users', value: nf(users.length) },
+      { label: 'Admins', value: nf(admins) },
+      { label: 'Viewers', value: nf(users.length - admins) },
+      { label: 'Viewers with no projects', value: nf(users.filter(u => u.role === 'viewer' && !u.projects.length).length),
+        flag: users.some(u => u.role === 'viewer' && !u.projects.length) },
+    ]));
+
+    if (notice) {
+      host.appendChild(el(`<div class="notice user-secret"><strong>${esc(notice.title)}</strong><br>
+        Share it with them directly (not by email or chat if you can avoid it). It is shown once;
+        they can change it under <em>Change password</em> after signing in.
+        <code>${esc(notice.password)}</code></div>`));
+    }
+
+    // ---- add a user
+    const add = el(`<section class="block user-add"><h3>Add a user</h3>
+      <div class="rail">
+        <div class="field"><label for="nu-name">Username</label><input id="nu-name" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="nu-pass">Temporary password</label><input id="nu-pass" autocomplete="new-password" spellcheck="false"></div>
+        <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-quiet" data-act="gen">Generate</button></div>
+        <div class="field"><label for="nu-role">Role</label><select id="nu-role">
+          <option value="viewer">Viewer - sees assigned projects, read-only</option>
+          <option value="admin">Admin - every project, manages users</option></select></div>
+        <div class="spacer"></div>
+        <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-primary" data-act="add">Add user</button></div>
+      </div>
+      <div class="nu-projects"><p class="hint">Projects this viewer can see:</p></div>
+    </section>`);
+    const pass = add.querySelector('#nu-pass');
+    const role = add.querySelector('#nu-role');
+    const projWrap = add.querySelector('.nu-projects');
+    const picker = projectPicker([]);
+    projWrap.appendChild(picker);
+    const syncRole = () => { projWrap.hidden = role.value === 'admin'; };
+    role.onchange = syncRole; syncRole();
+    add.querySelector('[data-act="gen"]').onclick = () => { pass.value = makeTempPassword(); };
+    add.querySelector('[data-act="add"]').onclick = () => {
+      const username = add.querySelector('#nu-name').value.trim(), password = pass.value;
+      run(async () => {
+        await api('POST', '/api/users', { username, password, role: role.value,
+                                          projects: role.value === 'admin' ? [] : picker.value() });
+        notice = { title: `Temporary password for ${username}:`, password };
+      }, `Added ${username}`);
+    };
+    host.appendChild(add);
+
+    // ---- the user list
+    const me = SERVER.username.toLowerCase();
+    const table = el(`<section class="block user-list"><h3>Users</h3><div class="tablewrap"><div class="tablescroll">
+      <table><thead><tr><th>Username</th><th>Role</th><th>Projects</th><th></th></tr></thead><tbody></tbody></table>
+      </div></div></section>`);
+    const tbody = table.querySelector('tbody');
+    users.forEach(u => {
+      const self = u.username.toLowerCase() === me;
+      const projects = u.role === 'admin' ? '<span class="zero">All projects</span>'
+        : u.projects.length ? `<span title="${esc(u.projects.map(nameOf).join('\n'))}">${u.projects.length} project${u.projects.length === 1 ? '' : 's'}</span>
+            <span class="sub clip">${esc(u.projects.map(nameOf).join(', '))}</span>`
+        : '<span class="dot dot-alert">None assigned</span>';
+      const tr = el(`<table><tbody><tr>
+        <td><strong>${esc(u.username)}</strong>${self ? ' <span class="zero">(you)</span>' : ''}</td>
+        <td><select class="region-pick" aria-label="Role for ${esc(u.username)}">
+          ${['viewer', 'admin'].map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r === 'admin' ? 'Admin' : 'Viewer'}</option>`).join('')}
+        </select></td>
+        <td>${projects}</td>
+        <td class="user-actions">
+          ${u.role === 'viewer' ? '<button type="button" class="btn btn-quiet" data-act="projects">Projects</button>' : ''}
+          <button type="button" class="btn btn-quiet" data-act="reset">Reset password</button>
+          ${self ? '' : '<button type="button" class="btn btn-quiet btn-danger" data-act="remove">Remove</button>'}
+        </td></tr></tbody></table>`).querySelector('tr');
+      tr.querySelector('select').onchange = e => run(
+        () => api('PUT', `/api/users/${encodeURIComponent(u.username)}`, { role: e.target.value }),
+        `${u.username} is now ${e.target.value === 'admin' ? 'an admin' : 'a viewer'}`)
+        // Changing your own role changes what this page should show; reload into it.
+        .then(ok => { if (ok && self) location.reload(); });
+      const projBtn = tr.querySelector('[data-act="projects"]');
+      if (projBtn) projBtn.onclick = () => { editing = editing === u.username ? null : u.username; render(); };
+      tr.querySelector('[data-act="reset"]').onclick = () => {
+        if (!confirm(`Reset ${u.username}'s password? They will be signed out everywhere.`)) return;
+        const password = makeTempPassword();
+        run(async () => {
+          await api('PUT', `/api/users/${encodeURIComponent(u.username)}`, { password });
+          notice = { title: `New password for ${u.username}:`, password };
+        }, `Password reset for ${u.username}`);
+      };
+      const rm = tr.querySelector('[data-act="remove"]');
+      if (rm) rm.onclick = () => {
+        if (!confirm(`Remove ${u.username}? They will lose access immediately.`)) return;
+        run(() => api('DELETE', `/api/users/${encodeURIComponent(u.username)}`), `Removed ${u.username}`);
+      };
+      tbody.appendChild(tr);
+
+      if (editing === u.username) {
+        const edit = el(`<table><tbody><tr class="user-edit"><td colspan="4">
+          <p class="hint">Projects <strong>${esc(u.username)}</strong> can see:</p></td></tr></tbody></table>`).querySelector('tr');
+        const cell = edit.querySelector('td');
+        const p = projectPicker(u.projects);
+        cell.appendChild(p);
+        const save = el('<div class="user-edit-actions"><button type="button" class="btn btn-primary">Save projects</button> <button type="button" class="btn btn-quiet">Cancel</button></div>');
+        save.children[0].onclick = () => run(async () => {
+          await api('PUT', `/api/users/${encodeURIComponent(u.username)}`, { projects: p.value() });
+          editing = null;
+        }, `Projects updated for ${u.username}`);
+        save.children[1].onclick = () => { editing = null; render(); };
+        cell.appendChild(save);
+        tbody.appendChild(edit);
+      }
+    });
+    host.appendChild(table);
+  }
+  load();
 }
 
 // ================================================================ shell
@@ -2602,10 +2915,18 @@ const TABS = [
     mount: s => tabLedger(s, 'track_trace') },
   { id: 'quality_compliance', title: 'Quality & Compliance', lede: LEDGER_TABS.quality_compliance.lede,
     mount: s => tabLedger(s, 'quality_compliance') },
-  { id: 'regions', title: 'Regions', config: true,
+  { id: 'regions', title: 'Regions', config: true, adminOnly: true,
     lede: 'Assign each project to the east or west coast. This mapping is maintained here, not in SiteSense, and drives the Region filter on every other tab.',
     mount: tabRegions },
+  { id: 'users', title: 'Users', config: true, adminOnly: true, serverOnly: true,
+    lede: 'Who can sign in, what they can do, and which projects each viewer can see. Admins see every project.',
+    mount: tabUsers },
 ];
+// Viewers never get the admin tabs; the Users tab only exists on the server,
+// since the local desktop copy has no accounts.
+for (let i = TABS.length - 1; i >= 0; i--) {
+  if ((TABS[i].adminOnly && !IS_ADMIN) || (TABS[i].serverOnly && !SERVER)) TABS.splice(i, 1);
+}
 
 function openTab(id) {
   const tab = TABS.find(t => t.id === id);
@@ -2684,7 +3005,16 @@ async function startRefresh() {
   const btn = document.getElementById('refreshBtn');
   btn.disabled = true;
   setRefreshStatus('running', '<span class="dot dot-warn"></span>Starting...');
+  if (SERVER) {
+    try { await api('POST', '/refresh'); pollRefreshStatus(); }
+    catch (err) {
+      btn.disabled = false;
+      setRefreshStatus('error', `<span class="dot dot-alert"></span>${esc(err.message)}`);
+    }
+    return;
+  }
   try {
+    // No custom headers here: refresh_server.py's CORS preflight only allows Content-Type.
     const res = await fetch(REFRESH_BASE + '/refresh', { method: 'POST' });
     await res.json();
     pollRefreshStatus();
@@ -2698,6 +3028,9 @@ async function startRefresh() {
 
 function initRefreshButton() {
   const btn = document.getElementById('refreshBtn');
+  // Refreshing hits the SiteSense API for every project, so on the server it is
+  // an admin action; viewers still get fresh data from the daily schedule.
+  if (!IS_ADMIN) { btn.hidden = true; return; }
   btn.addEventListener('click', startRefresh);
   // Silent probe: if a refresh was already under way before this page loaded
   // (the tab was reloaded mid-run), resume tracking it. Say nothing if the
@@ -2711,7 +3044,7 @@ function boot() {
   const gen = new Date(D.generated_at);
   document.getElementById('stamp').textContent =
     `Data pulled ${gen.toLocaleString('en-AU', {dateStyle: 'medium', timeStyle: 'short'})} `
-    + `· ${PROJ.length} projects · ${nf(D.materials.length)} materials`;
+    + `· ${PROJ.length} project${PROJ.length === 1 ? '' : 's'} · ${nf(D.materials.length)} materials`;
 
   const tabsEl = document.getElementById('tabstrip');
   TABS.forEach(t => {
@@ -2724,8 +3057,37 @@ function boot() {
   openTab(TABS.some(t => t.id === wanted) ? wanted : TABS[0].id);
 }
 
+// ---------------------------------------------------------------- signed-in user (server only)
+function initUserBox() {
+  if (!SERVER) return;
+  const box = document.getElementById('userBox');
+  box.hidden = false;
+  box.innerHTML = `<span class="user-name" title="Signed in">${esc(SERVER.username)}
+      <span class="user-role">${SERVER.role === 'admin' ? 'Admin' : 'Viewer'}</span></span>
+    <button type="button" class="btn btn-quiet" id="pwOpen">Change password</button>
+    <form method="post" action="/logout"><button type="submit" class="btn btn-quiet">Sign out</button></form>`;
+
+  const dlg = document.getElementById('pwDialog');
+  const errBox = document.getElementById('pwError');
+  document.getElementById('pwOpen').onclick = () => {
+    document.getElementById('pwForm').reset(); errBox.textContent = ''; dlg.showModal();
+  };
+  document.getElementById('pwCancel').onclick = () => dlg.close();
+  document.getElementById('pwForm').onsubmit = async e => {
+    e.preventDefault();
+    const current = document.getElementById('pwCurrent').value;
+    const next = document.getElementById('pwNew').value;
+    if (next !== document.getElementById('pwConfirm').value) { errBox.textContent = 'The new passwords don\'t match.'; return; }
+    try {
+      await api('POST', '/api/password', { current, new: next });
+      dlg.close(); toast('Password changed', 'ok');
+    } catch (err) { errBox.textContent = err.message; }
+  };
+}
+
 boot();
 initRefreshButton();
+initUserBox();
 </script>
 </body>
 </html>

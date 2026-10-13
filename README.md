@@ -72,12 +72,17 @@ the sensible default regardless of what protects the *hosted* copy.
    |---|---|
    | `SITESENSE_API_ENDPOINT` | same as `config.json`'s `api_endpoint` |
    | `SITESENSE_AUTH_HEADER` | same as `config.json`'s `auth_header_value` |
-   | `DASHBOARD_USER` | a username your team will use to view the dashboard |
-   | `DASHBOARD_PASSWORD` | a password for the same |
+   | `DASHBOARD_USER` | username for the **first admin** account |
+   | `DASHBOARD_PASSWORD` | password for the first admin (change it after signing in) |
    | `DATA_DIR` | `/data` (must match the Volume's mount path from step 2) |
    | `REFRESH_HOUR_UTC` | optional, defaults to `22` (≈ 6am AWST) |
+   | `SESSION_SECRET` | optional; signs login cookies. If unset, one is generated and kept on the Volume |
 
    Railway sets `PORT` itself - do not add it yourself.
+
+   `DASHBOARD_USER` / `DASHBOARD_PASSWORD` are only used once, to create the
+   first admin when no accounts exist. After that, accounts are managed from
+   the dashboard's **Users** tab and changing these variables has no effect.
 
 4. Deploy. First boot has no data yet, so it shows a small "first refresh in
    progress" page that auto-refreshes every 15 seconds and starts pulling
@@ -85,21 +90,41 @@ the sensible default regardless of what protects the *hosted* copy.
    size of the SiteSense dataset (tens of thousands of rows across several
    document types), same as it does locally.
 
-### Why a Volume, and why Basic Auth
+### Users, roles and project access
 
-- **Volume**: Railway containers are ephemeral by default - local disk resets
-  on every redeploy. `regions.json` and `delivery_dates.json` are real,
-  manually-entered data (which project is East/West, delivery dates), not
-  something to regenerate from scratch each time. `data.json` and the built
-  dashboard also survive between deploys this way, so a redeploy does not
-  force a 15-20 minute wait before anyone can see anything.
-- **Basic Auth**: the dashboard is not aggregate/anonymised - it shows real PO
-  values, vendor names and who checked in each receipt. `DASHBOARD_USER` /
-  `DASHBOARD_PASSWORD` gate every route, including `/refresh`, so a public
-  Railway URL is not also a public "hit the SiteSense API on demand" button
-  for anyone who finds the link. Leaving both unset is possible (server.py
-  prints a loud warning and runs unauthenticated) but is only meant for a
-  quick throwaway test, not real use.
+Everyone signs in on a login page. There are two roles:
+
+| | Admin | Viewer |
+|---|---|---|
+| Projects visible | All | Only those assigned to them |
+| Users tab (add/remove users, roles, projects, password resets) | Yes | No |
+| Refresh data button | Yes | No (data still refreshes daily) |
+| Edit Regions and Estimated/Promised Delivery Dates | Yes, shared with everyone | Read-only |
+
+- **Project access is enforced on the server, not just hidden.** A viewer's
+  page is built from a filtered copy of the data (`data_filter.py`) holding
+  only their projects' rows and the names, vendors and materials those rows
+  use - other projects' data never reaches their browser, page source
+  included. If `fetch_data.py` ever changes a row's layout without
+  `data_filter.py` being updated to match, viewers get an "unavailable" page
+  rather than a possibly-leaky one.
+- **Passwords** are stored only as salted PBKDF2 hashes in `users.json` on the
+  Volume. New passwords must be 10+ characters. Eight failed sign-ins lock an
+  account for 10 minutes.
+- **Sessions** last 7 days. Resetting a user's password, changing their role or
+  removing them signs them out everywhere immediately.
+- Regions and delivery dates edited by an admin are saved on the server and
+  show for everyone on their next page load - no download/upload step.
+- The local Windows copy (`Launch Dashboard.bat`) has no accounts and works
+  exactly as before.
+
+### Why a Volume
+
+Railway containers are ephemeral by default - local disk resets on every
+redeploy. The Volume holds everything that must survive: `users.json` (the
+accounts), `regions.json` and `delivery_dates.json` (manually entered, not
+regenerable), and `data.json` (so a redeploy does not force a 15-20 minute
+wait before anyone can see anything).
 
 ### Updating the deployed dashboard
 
@@ -120,9 +145,10 @@ this way; the data itself refreshes on its own daily schedule or via the
   when opened via `file://` (the local workflow); served over http(s) it
   calls the same origin instead, which is what makes one template work for
   both `refresh_server.py` locally and `server.py` on Railway.
-- `server.py` is new and Railway-only: it serves the dashboard, gates
-  everything behind Basic Auth, and runs the daily refresh in-process since
-  Railway has no Task Scheduler equivalent. `refresh_server.py` is untouched.
+- `server.py` is Railway-only: it handles sign-in and roles, builds each
+  user's page from `data.json` filtered to their projects, serves the admin
+  APIs, and runs the daily refresh in-process since Railway has no Task
+  Scheduler equivalent. `refresh_server.py` is untouched.
 
 ## Files
 
@@ -131,8 +157,11 @@ this way; the data itself refreshes on its own daily schedule or via the
 | `fetch_data.py` | Pulls SiteSense data, writes `data.json` + the built dashboard |
 | `dashboard_template.html` | The dashboard's HTML/CSS/JS, data-free |
 | `refresh_server.py` | Local-only refresh helper (Windows desktop workflow) |
-| `server.py` | Hosted web server for Railway (dashboard + refresh + daily schedule) |
+| `server.py` | Hosted web server for Railway (sign-in, per-user pages, admin APIs, daily refresh) |
+| `users.py` | Accounts, roles, password hashing, sessions, login lockout |
+| `data_filter.py` | Cuts `data.json` down to one user's projects; must match `fetch_data.py`'s row layouts |
 | `config.json` / `config.json.example` | SiteSense credentials (local dev only, gitignored) |
 | `.env.example` | Documents the environment variables `server.py` and Railway need |
 | `regions.json`, `delivery_dates.json` | Manually-entered overlays, not derived from SiteSense |
+| `users.json`, `.session_secret` | Accounts and cookie-signing key (on the Volume, gitignored) |
 | `data.json`, `PMO_Dashboard*.html` | Generated output, gitignored, rebuilt by `fetch_data.py` |

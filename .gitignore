@@ -11,6 +11,11 @@ PMO_Dashboard.html
 PMO_Dashboard_artifact.html
 .fetch.lock
 
+# --- Accounts and session signing key (server.py) - never commit ---
+users.json
+.session_secret
+data/
+
 # --- User-entered overlays - real per-deployment data, not source. Keep
 # these out of git; back them up via the dashboard's own download buttons. ---
 regions.json
