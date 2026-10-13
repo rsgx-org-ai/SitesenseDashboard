@@ -10,9 +10,13 @@ Who sees what:
     admin  - every project; the Users tab (add/remove users, roles, project
              assignments, password resets); the Refresh button; edits to the
              shared Regions and Estimated/Promised Delivery Date overlays
-    viewer - only their assigned projects, read-only. Their page is built from
-             a filtered copy of the data (data_filter.py), so other projects'
-             rows are never sent to their browser at all
+    standard - only their assigned projects; can also edit those projects'
+             Estimated/Promised Delivery Dates
+    viewer - only their assigned projects, read-only. Viewer and standard
+             pages are built from a filtered copy of the data (data_filter.py),
+             so other projects' rows are never sent to their browser at all
+    Everyone can comment on Inventory, Storage and Receipts rows they can see;
+    authors delete their own comments, admins any.
 
 Routes:
     GET  /login, POST /login, POST /logout     sign in / out (cookie session)
@@ -21,7 +25,9 @@ Routes:
     POST /refresh                              start a data pull (admin)
     GET  /api/me, POST /api/password           current user / change own password
     GET|POST /api/users, PUT|DELETE /api/users/<name>     user admin (admin)
-    PUT  /api/regions, PUT /api/delivery-dates             shared overlays (admin)
+    PUT  /api/regions                                      shared overlay (admin)
+    PUT  /api/delivery-dates                               shared overlay (admin, standard)
+    POST /api/comments, DELETE /api/comments/<id>          row comments (everyone)
 
 Accounts live in DATA_DIR/users.json. On first boot with no accounts, the admin
 is created from DASHBOARD_USER / DASHBOARD_PASSWORD; after that, users are
@@ -34,6 +40,7 @@ AWST), since Railway has no Windows Task Scheduler.
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
 import threading
@@ -62,8 +69,13 @@ TEMPLATE_FILE = HERE / "dashboard_template.html"
 DATA_FILE = DATA_DIR / "data.json"
 REGION_FILE = DATA_DIR / "regions.json"
 DELIVERY_FILE = DATA_DIR / "delivery_dates.json"
+COMMENTS_FILE = DATA_DIR / "comments.json"
 REGION_CHOICES = ("East", "West", "")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# A comment's row key starts with its table and SiteSense project id, e.g.
+# "inv|14214|<material guid>" - the project id is what access is checked on.
+COMMENT_KEY_RE = re.compile(r"^(inv|sto|rcp)\|(\d{1,9})\|.{1,500}$", re.S)
+COMMENT_MAX = 2000
 
 store = UserStore(DATA_DIR)
 overlay_lock = threading.Lock()
@@ -145,6 +157,45 @@ def project_catalog():
     return [{"id": p["id"], "name": p["name"]} for p in (data or {}).get("projects", [])]
 
 
+def allowed_projects(user):
+    """SiteSense project ids this user may see, or None meaning every project."""
+    return None if user["role"] == "admin" else {int(p) for p in user.get("projects", [])}
+
+
+_guid_projects = {"mtime": None, "map": {}}
+
+
+def material_projects(guid):
+    """Which projects a material GUID appears in, so a standard user can only
+    change delivery dates on materials inside their own projects."""
+    data, mtime = _read_json(DATA_FILE, None)
+    with _cache_lock:
+        if _guid_projects["mtime"] != mtime:
+            mapping = {}
+            if data:
+                strings, mats, projects = data["strings"], data["materials"], data["projects"]
+                for table in ("inventory", "storage", "transfers", "assets", "receipts", "fim", "issuing"):
+                    for row in data.get(table, []):
+                        g = strings[mats[row[1]][4]]
+                        mapping.setdefault(g, set()).add(int(projects[row[0]]["id"]))
+            _guid_projects.update(mtime=mtime, map=mapping)
+        return _guid_projects["map"].get(guid, set())
+
+
+def comments_for(user):
+    """The comment threads on rows this user can see (keyed by row key)."""
+    comments, _ = _read_json(COMMENTS_FILE, {})
+    allowed = allowed_projects(user)
+    if allowed is None:
+        return comments
+    out = {}
+    for key, thread in comments.items():
+        m = COMMENT_KEY_RE.match(key)
+        if m and int(m.group(2)) in allowed:
+            out[key] = thread
+    return out
+
+
 _page_lock = threading.Lock()
 _page_cache = {}   # scope key -> (version tuple, bytes)
 
@@ -156,10 +207,11 @@ def build_page(user):
         return None
     regions, reg_m = _read_json(REGION_FILE, {})
     dates, del_m = _read_json(DELIVERY_FILE, {})
+    _, com_m = _read_json(COMMENTS_FILE, {})
     tmpl_m = TEMPLATE_FILE.stat().st_mtime
     is_admin = user["role"] == "admin"
     scope = "ALL" if is_admin else tuple(user.get("projects", []))
-    version = (data_m, reg_m, del_m, tmpl_m, user["username"], user["role"])
+    version = (data_m, reg_m, del_m, com_m, tmpl_m, user["username"], user["role"])
     with _page_lock:
         hit = _page_cache.get(scope)
         if hit and hit[0] == version:
@@ -173,7 +225,7 @@ def build_page(user):
     merged["delivery_dates"] = dates
     payload = merged if is_admin else filter_data(merged, user.get("projects", []))
 
-    context = {"username": user["username"], "role": user["role"]}
+    context = {"username": user["username"], "role": user["role"], "comments": comments_for(user)}
     def js(v):   # "</" must not appear raw inside a <script> block
         return json.dumps(v, separators=(",", ":")).replace("</", "<\\/")
     html = TEMPLATE_FILE.read_text(encoding="utf-8").replace(
@@ -404,6 +456,11 @@ class Handler(BaseHTTPRequestHandler):
                                            b.get("role"), b.get("projects") or [])
                     self._json(200, {"user": created})
                 return
+            if path == "/api/comments":
+                user = self._api_guard()
+                if user:
+                    self._add_comment(self._json_body(), user)
+                return
             self._json(404, {"error": "not found"})
         except UserError as exc:
             self._json(400, {"error": str(exc)})
@@ -428,8 +485,12 @@ class Handler(BaseHTTPRequestHandler):
                     self._save_regions(self._json_body())
                 return
             if path == "/api/delivery-dates":
-                if self._api_guard(admin=True):
-                    self._save_delivery_date(self._json_body())
+                user = self._api_guard()
+                if not user:
+                    return
+                if user["role"] not in ("admin", "standard"):
+                    return self._json(403, {"error": "Your role can't change delivery dates."})
+                self._save_delivery_date(self._json_body(), user)
                 return
             self._json(404, {"error": "not found"})
         except UserError as exc:
@@ -447,6 +508,11 @@ class Handler(BaseHTTPRequestHandler):
                     raise UserError("You can't remove your own account.")
                 store.delete(name)
                 return self._json(200, {"ok": True})
+            if path.startswith("/api/comments/"):
+                user = self._api_guard()
+                if user:
+                    self._delete_comment(unquote(path[len("/api/comments/"):]), user)
+                return
             self._json(404, {"error": "not found"})
         except UserError as exc:
             self._json(400, {"error": str(exc)})
@@ -479,12 +545,59 @@ class Handler(BaseHTTPRequestHandler):
             _write_json(REGION_FILE, regions)
         self._json(200, {"ok": True})
 
-    def _save_delivery_date(self, body):
+    def _comment_key(self, key, user):
+        """Validate a row key and check the user can see that row's project."""
+        m = COMMENT_KEY_RE.match(key or "")
+        if not m:
+            raise UserError("Unknown row.")
+        allowed = allowed_projects(user)
+        if allowed is not None and int(m.group(2)) not in allowed:
+            raise UserError("That row isn't in one of your projects.")
+        return key
+
+    def _add_comment(self, body, user):
+        key = self._comment_key(str(body.get("key", "")), user)
+        text = str(body.get("text", "")).strip()
+        if not text:
+            raise UserError("Comment is empty.")
+        if len(text) > COMMENT_MAX:
+            raise UserError(f"Comments are limited to {COMMENT_MAX} characters.")
+        entry = {"id": secrets.token_hex(6), "user": user["username"], "text": text,
+                 "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        with overlay_lock:
+            comments, _ = _read_json(COMMENTS_FILE, {})
+            comments = {k: list(v) for k, v in comments.items()}
+            comments.setdefault(key, []).append(entry)
+            _write_json(COMMENTS_FILE, comments)
+        self._json(200, {"comment": entry, "thread": comments[key]})
+
+    def _delete_comment(self, comment_id, user):
+        with overlay_lock:
+            comments, _ = _read_json(COMMENTS_FILE, {})
+            comments = {k: list(v) for k, v in comments.items()}
+            for key, thread in comments.items():
+                hit = next((c for c in thread if c["id"] == comment_id), None)
+                if not hit:
+                    continue
+                self._comment_key(key, user)   # must still be able to see the row
+                if user["role"] != "admin" and hit["user"].lower() != user["username"].lower():
+                    raise UserError("You can only delete your own comments.")
+                thread.remove(hit)
+                if not thread:
+                    del comments[key]
+                _write_json(COMMENTS_FILE, comments)
+                return self._json(200, {"ok": True, "key": key, "thread": thread})
+        raise UserError("That comment no longer exists.")
+
+    def _save_delivery_date(self, body, user):
         guid, field, value = str(body.get("guid", "")), body.get("field"), str(body.get("value") or "")
         if not guid or len(guid) > 100 or field not in ("estimated", "promised"):
             raise UserError("Unknown delivery date field.")
         if value and not DATE_RE.match(value):
             raise UserError("Dates must be YYYY-MM-DD.")
+        allowed = allowed_projects(user)
+        if allowed is not None and not (material_projects(guid) & allowed):
+            raise UserError("That material isn't in one of your projects.")
         with overlay_lock:
             dates, _ = _read_json(DELIVERY_FILE, {})
             dates = {k: dict(v) for k, v in dates.items()}

@@ -13,6 +13,7 @@ PMO_Dashboard_artifact.html
 
 # --- Accounts and session signing key (server.py) - never commit ---
 users.json
+comments.json
 .session_secret
 data/
 

@@ -92,14 +92,23 @@ the sensible default regardless of what protects the *hosted* copy.
 
 ### Users, roles and project access
 
-Everyone signs in on a login page. There are two roles:
+Everyone signs in on a login page. There are three roles:
 
-| | Admin | Viewer |
-|---|---|---|
-| Projects visible | All | Only those assigned to them |
-| Users tab (add/remove users, roles, projects, password resets) | Yes | No |
-| Refresh data button | Yes | No (data still refreshes daily) |
-| Edit Regions and Estimated/Promised Delivery Dates | Yes, shared with everyone | Read-only |
+| | Admin | Standard | Viewer |
+|---|---|---|---|
+| Projects visible | All | Only those assigned | Only those assigned |
+| Edit Estimated/Promised Delivery Dates | Yes | Yes, on their projects | No |
+| Comment on Inventory, Storage and Receipts rows | Yes | Yes | Yes |
+| Delete comments | Anyone's | Their own | Their own |
+| Edit Regions | Yes | No | No |
+| Users tab (add/remove users, roles, projects, password resets) | Yes | No | No |
+| Refresh data button | Yes | No | No (data still refreshes daily) |
+
+Comments are threads per row, with author and time, saved in `comments.json`
+on the Volume. The server checks the row's project on every read and write,
+so a comment is only ever visible to people who can see that project.
+Comments are included in the column's search and in Excel exports. They
+need the server, so the local desktop copy doesn't show them.
 
 - **Project access is enforced on the server, not just hidden.** A viewer's
   page is built from a filtered copy of the data (`data_filter.py`) holding
@@ -164,4 +173,5 @@ this way; the data itself refreshes on its own daily schedule or via the
 | `.env.example` | Documents the environment variables `server.py` and Railway need |
 | `regions.json`, `delivery_dates.json` | Manually-entered overlays, not derived from SiteSense |
 | `users.json`, `.session_secret` | Accounts and cookie-signing key (on the Volume, gitignored) |
+| `comments.json` | Row comments (on the Volume, gitignored) |
 | `data.json`, `PMO_Dashboard*.html` | Generated output, gitignored, rebuilt by `fetch_data.py` |

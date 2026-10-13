@@ -226,6 +226,31 @@
   .user-actions .btn { padding: 4px 9px; min-height: 28px; font-size: var(--step-1); }
   .user-edit td { background: var(--surface-sunk); }
   .user-edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  /* ---------- row comments ---------- */
+  .cmt-btn { appearance: none; display: inline-flex; align-items: baseline; gap: 6px; max-width: 30ch;
+             font: var(--step-1) system-ui, sans-serif; color: var(--ink-2); text-align: left; cursor: pointer;
+             background: none; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; }
+  .cmt-btn:hover { border-color: var(--rule-strong); color: var(--ink); background: var(--surface); }
+  .cmt-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .cmt-empty { color: var(--ink-3); white-space: nowrap; }
+  .cmt-empty::before { content: "+"; font-weight: 700; margin-right: 2px; }
+  .cmt-count { flex: none; font-weight: 700; font-size: 10px; min-width: 18px; text-align: center;
+               color: var(--surface); background: var(--ink-2); border-radius: 999px; padding: 1px 5px; }
+  .cmt-last { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .cmt-dialog { width: min(520px, calc(100vw - 32px)); }
+  .cmt-sub { color: var(--ink-3); font-size: var(--step-1); margin: -8px 0 12px; }
+  .cmt-thread { max-height: 46vh; overflow-y: auto; margin-bottom: 14px; display: grid; gap: 8px; }
+  .cmt-item { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; background: var(--surface-sunk); }
+  .cmt-meta { display: flex; align-items: baseline; gap: 8px; font-size: var(--step-1); color: var(--ink-3); }
+  .cmt-meta strong { color: var(--ink); }
+  .cmt-meta .cmt-del { margin-left: auto; padding: 1px 7px; min-height: 0; font-size: var(--step-1); }
+  .cmt-text { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 3px; }
+  .cmt-label { display: block; font-size: var(--step-1); font-weight: 600; letter-spacing: 0.03em;
+               text-transform: uppercase; color: var(--ink-3); margin-bottom: 5px; }
+  .cmt-dialog textarea { width: 100%; box-sizing: border-box; resize: vertical; font: var(--step0)/1.45 system-ui, sans-serif;
+                         color: var(--ink); background: var(--surface); border: 1px solid var(--rule-strong);
+                         border-radius: 6px; padding: 7px 9px; }
+  .cmt-dialog textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .user-secret { max-width: none; margin-bottom: 20px; }
   .user-secret code { display: inline-block; margin-top: 8px; padding: 6px 10px; border-radius: 6px;
                       background: var(--surface); border: 1px solid var(--rule-strong);
@@ -471,6 +496,9 @@ const D = SITESENSE_DATA;
    so everything behaves exactly as before and the local user has full rights. */
 const SERVER = typeof SERVER_CONTEXT !== 'undefined' ? SERVER_CONTEXT : null;
 const IS_ADMIN = !SERVER || SERVER.role === 'admin';
+// Standard users may also set delivery dates (on their own projects - the server checks).
+const CAN_EDIT_DATES = IS_ADMIN || SERVER.role === 'standard';
+const ROLE_LABEL = { admin: 'Admin', standard: 'Standard', viewer: 'Viewer' };
 
 // Same-origin JSON call to server.py. The custom header is what server.py's
 // CSRF check looks for; only sent in server mode, where it is same-origin.
@@ -596,6 +624,113 @@ function saveDeliveryDates() {
   try { localStorage.setItem(DELIVERY_KEY, JSON.stringify(deliveryDates)); return true; }
   catch (e) { return false; }
 }
+
+/* ------------------------------------------------------------ row comments
+   Server only (they need somewhere shared to live). Each thread is keyed by
+   "<table>|<SiteSense project id>|<row identity>"; the server checks the
+   project id on every read and write, so a thread is only ever visible to
+   people who can see that project. Row identities use the material GUID and
+   document numbers rather than row positions, so comments stay on the right
+   row across refreshes. */
+const COMMENTS = SERVER ? { ...(SERVER.comments || {}) } : {};
+const projectIdOf = p => D.projects[p].id;
+const COMMENT_KEYS = {
+  inventory: r => `inv|${projectIdOf(r[0])}|${matGuid(r[1])}`,
+  // storage row: [p, m, location, condition, qty]
+  storage: r => `sto|${projectIdOf(r[0])}|${matGuid(r[1])}|${S(r[2])}|${S(r[3])}`,
+  // receipt row: [p, m, receipt, ..., lineNo at 15]
+  receipts: r => `rcp|${projectIdOf(r[0])}|${S(r[2])}|${S(r[15])}|${matGuid(r[1])}`,
+};
+
+function commentCell(key, label) {
+  const thread = COMMENTS[key] || [];
+  if (!thread.length) {
+    return `<button type="button" class="cmt-btn cmt-empty" data-key="${esc(key)}" data-label="${esc(label)}">Add comment</button>`;
+  }
+  const last = thread[thread.length - 1];
+  return `<button type="button" class="cmt-btn" data-key="${esc(key)}" data-label="${esc(label)}"
+    title="${esc(thread.map(c => `${c.user}: ${c.text}`).join('\n'))}">
+    <span class="cmt-count">${thread.length}</span><span class="cmt-last">${esc(last.user)}: ${esc(last.text)}</span></button>`;
+}
+
+// A table column showing each row's thread. Its value is the full thread text,
+// so the column's search box and the Excel export both include comments.
+function commentColumn(keyFn, labelFn) {
+  return {
+    label: 'Comments', search: true,
+    value: r => (COMMENTS[keyFn(r)] || []).map(c => `${c.user}: ${c.text}`).join(' | '),
+    cell: r => commentCell(keyFn(r), labelFn(r)),
+  };
+}
+
+function openComments(key, label) {
+  let dlg = document.getElementById('cmtDialog');
+  if (!dlg) {
+    dlg = el(`<dialog id="cmtDialog" class="pw-dialog cmt-dialog" aria-labelledby="cmtTitle">
+      <h3 id="cmtTitle">Comments</h3><p class="hint cmt-sub" id="cmtSub"></p>
+      <div class="cmt-thread" id="cmtThread"></div>
+      <form id="cmtForm">
+        <label class="cmt-label" for="cmtText">Add a comment</label>
+        <textarea id="cmtText" rows="3" maxlength="2000" required></textarea>
+        <p class="pw-error" id="cmtError" role="alert"></p>
+        <div class="pw-actions">
+          <button type="button" class="btn btn-quiet" id="cmtClose">Close</button>
+          <button type="submit" class="btn btn-primary">Add comment</button>
+        </div>
+      </form></dialog>`);
+    document.body.appendChild(dlg);
+    dlg.querySelector('#cmtClose').onclick = () => dlg.close();
+  }
+  const threadBox = dlg.querySelector('#cmtThread');
+  const errBox = dlg.querySelector('#cmtError');
+  const text = dlg.querySelector('#cmtText');
+  dlg.querySelector('#cmtSub').textContent = label;
+
+  // Keep every visible cell for this row in step with the thread.
+  const syncCells = () => document.querySelectorAll('.cmt-btn').forEach(b => {
+    if (b.dataset.key === key) b.outerHTML = commentCell(key, label);
+  });
+  const paint = () => {
+    const thread = COMMENTS[key] || [];
+    const me = SERVER.username.toLowerCase();
+    threadBox.innerHTML = thread.length ? thread.map(c => `<div class="cmt-item">
+        <div class="cmt-meta"><strong>${esc(c.user)}</strong>
+          <span>${esc(new Date(c.at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }))}</span>
+          ${IS_ADMIN || c.user.toLowerCase() === me ? `<button type="button" class="btn btn-quiet btn-danger cmt-del" data-id="${esc(c.id)}">Delete</button>` : ''}
+        </div><div class="cmt-text">${esc(c.text)}</div></div>`).join('')
+      : '<p class="empty">No comments yet.</p>';
+    threadBox.querySelectorAll('.cmt-del').forEach(b => b.onclick = async () => {
+      if (!confirm('Delete this comment?')) return;
+      try {
+        const r = await api('DELETE', `/api/comments/${encodeURIComponent(b.dataset.id)}`);
+        if (r.thread.length) COMMENTS[key] = r.thread; else delete COMMENTS[key];
+        paint(); syncCells();
+      } catch (err) { errBox.textContent = err.message; }
+    });
+    threadBox.scrollTop = threadBox.scrollHeight;
+  };
+  dlg.querySelector('#cmtForm').onsubmit = async e => {
+    e.preventDefault();
+    errBox.textContent = '';
+    try {
+      const r = await api('POST', '/api/comments', { key, text: text.value });
+      COMMENTS[key] = r.thread;
+      text.value = '';
+      paint(); syncCells();
+    } catch (err) { errBox.textContent = err.message; }
+  };
+  errBox.textContent = ''; text.value = '';
+  paint();
+  dlg.showModal();
+  text.focus();
+}
+
+// One listener for every comment cell, since tables rebuild their cells on
+// every sort, page and filter.
+document.addEventListener('click', e => {
+  const b = e.target.closest('.cmt-btn');
+  if (b) openComments(b.dataset.key, b.dataset.label);
+});
 
 const SERIES = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
 const cvar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -1192,7 +1327,7 @@ function dataTable(cols, rows, opts = {}) {
   // count is small - "pick the exact quantity from a list" is not a filter
   // anyone wants; a search box that matches on the displayed number is more
   // useful there.
-  const colIsDropdown = cols.map((c, i) => !c.num && colOptions[i].length > 0 && colOptions[i].length <= MAX_DROPDOWN_OPTIONS);
+  const colIsDropdown = cols.map((c, i) => !c.num && !c.search && colOptions[i].length > 0 && colOptions[i].length <= MAX_DROPDOWN_OPTIONS);
   let filtered = rows, view = rows;
 
   function applyFilters() {
@@ -1325,7 +1460,7 @@ function strip(items) {
 }
 
 function block(title, hint, ...children) {
-  const b = el(`<section class="block"><h3>${esc(title)}</h3>${hint ? `<p class="hint">${esc(hint)}</p>` : ''}</section>`);
+  const b = el(`<section class="block"><h3>${esc(title)}</h3></section>`);
   children.filter(Boolean).forEach(c => b.appendChild(c));
   return b;
 }
@@ -1486,9 +1621,6 @@ function tabOverview(stage) {
           cell: r => r.receivedValue ? '$' + nf(Math.round(r.receivedValue)) : '<span class="zero">0</span>' },
       ], per, { sortAt: 2, pageSize: 40, exportName: 'Overview_by_Project' })));
 
-    host.appendChild(el(`<p class="notice">Counts are documents, stock lines and parts, which add up
-      across projects. Received value is the only money figure here and depends on purchase order unit
-      costs, some of which are unreliable in the source data. The Asset Tracking tab explains where.</p>`));
   }
   render();
 }
@@ -1589,17 +1721,8 @@ function tabInventory(stage) {
       { label: 'Awaiting receipt', value: nf(nAwait), flag: nAwait > 0 },
       { label: 'Held or damaged', value: nf(nFlag), flag: nFlag > 0 },
     ]));
-    host.appendChild(el(`<details class="notice" style="margin-bottom:22px">
-      <summary><strong>Why these are counts, not quantities</strong></summary>
-      <div>Quantities mix units of measure across materials, so a portfolio-wide quantity total
-      would not be a real number. Quantities are shown per row in the table below, where a single
-      unit applies.</div></details>`));
 
     const dlBar = el('<div class="rail" style="margin-bottom:14px"></div>');
-    dlBar.appendChild(el(`<span class="hint" style="align-self:center; margin:0">
-      Estimated Delivery Date follows the PO created date (as SiteSense's Orders page shows it) unless
-      overridden here; Promised Delivery Date is entered here only - see the notice below the table.
-      ${!SERVER ? '' : IS_ADMIN ? 'Your edits save for everyone straight away.' : 'Only an admin can change these dates.'}</span>`));
     // On the server dates are saved for everyone per edit, so there is nothing to download.
     if (!SERVER) dlBar.appendChild(el('<div class="spacer"></div>'));
     const dl = el('<button class="btn btn-quiet">Download delivery_dates.json</button>');
@@ -1623,8 +1746,7 @@ function tabInventory(stage) {
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     };
-    if (!SERVER) dlBar.appendChild(dl);
-    host.appendChild(dlBar);
+    if (!SERVER) { dlBar.appendChild(dl); host.appendChild(dlBar); }
 
     const byType = {}, byProject = {};
     rows.forEach(r => {
@@ -1675,27 +1797,19 @@ function tabInventory(stage) {
             const title = manual ? 'Entered by hand on this dashboard'
               : shown ? 'From the PO created date, as SiteSense’s Orders page shows it. Pick a date to override.'
               : 'No PO linked to this stock line';
-            return `<input type="date" class="deliv-pick${manual ? '' : ' deliv-default'}" data-m="${r[1]}" data-field="estimated" value="${shown}" title="${title}"${IS_ADMIN ? '' : ' disabled'}>`;
+            return `<input type="date" class="deliv-pick${manual ? '' : ' deliv-default'}" data-m="${r[1]}" data-field="estimated" value="${shown}" title="${title}"${CAN_EDIT_DATES ? '' : ' disabled'}>`;
           } },
         { label: 'Promised delivery date', value: r => deliveryDateOf(r[1], 'promised'),
-          cell: r => `<input type="date" class="deliv-pick" data-m="${r[1]}" data-field="promised" value="${deliveryDateOf(r[1], 'promised')}"${IS_ADMIN ? '' : ' disabled'}>` },
+          cell: r => `<input type="date" class="deliv-pick" data-m="${r[1]}" data-field="promised" value="${deliveryDateOf(r[1], 'promised')}"${CAN_EDIT_DATES ? '' : ' disabled'}>` },
         { label: 'Location received into', value: r => receivedLoc(r[0], r[1]),
           cell: r => { const v = receivedLoc(r[0], r[1]); return v ? `<span class="clip" title="${esc(v)}">${esc(v)}</span>` : '<span class="zero">—</span>'; } },
         { label: 'Checked by', value: r => receivedBy(r[0], r[1]),
           cell: r => esc(receivedBy(r[0], r[1])) || '<span class="zero">—</span>' },
+        ...(SERVER ? [commentColumn(COMMENT_KEYS.inventory, r => `${matName(r[1])} · ${PROJ[r[0]]}`)] : []),
       ], rows, { sortAt: 9, exportName: 'Inventory',
         onRepaint: sc => sc.querySelectorAll('.deliv-pick').forEach(inp => {
           inp.onchange = () => { setDeliveryDate(+inp.dataset.m, inp.dataset.field, inp.value); saveDeliveryDates(); };
         }) })));
-
-    host.appendChild(el(`<p class="notice" style="margin-top:14px">
-      <strong>Estimated Delivery Date is derived; Promised Delivery Date is entered by hand.</strong>
-      SiteSense's Orders page shows Estimated Delivery Date equal to the PO's created date on every PO
-      checked, and the API exposes no separate field for it, so the dashed dates here come from the most
-      recent PO on each stock line. Pick a date to override one (it then shows solid). Promised Delivery
-      Date has no source in the API and is blank until entered. ${SERVER
-        ? 'Dates are shared: an admin\'s edit shows for everyone on their next page load.'
-        : 'Edits are remembered in this browser; to survive the next refresh, click <em>Download delivery_dates.json</em> above and save it into the dashboard folder, replacing the file there.'}</p>`));
   }
   render();
 }
@@ -1791,6 +1905,7 @@ function tabStorage(stage) {
         { label: 'Quantity', value: r => r[4], num: true, cell: r => nf(r[4]) },
         { label: 'UOM', value: r => matUom(r[1]) },
         { label: 'Status', value: r => S(r[3]), cell: condCell },
+        ...(SERVER ? [commentColumn(COMMENT_KEYS.storage, r => `${matName(r[1])} · ${S(r[2])}`)] : []),
       ], rows, { sortAt: 3, exportName: 'Storage' })));
   }
   render();
@@ -1890,12 +2005,6 @@ function tabFim(stage) {
       { label: 'Work packages', value: nf(new Set(rows.map(r => S(r[F.WP])).filter(Boolean)).size) },
     ]));
 
-    host.appendChild(el(`<p class="notice" style="margin-bottom:22px"><strong>What counts as FIM.</strong>
-      A part is free issue material when its work package name begins with <em>FIM</em>, which is the
-      naming convention the projects use when loading client supplied material into SiteSense. Parts
-      on other work packages, such as Consumables General or LV Cables, are normal procurement and are
-      not included. Received, issued and available are per part, so they are counted once even where a
-      part sits in several locations or containers.</p>`));
 
     const byWp = {}, byLoc = {};
     rows.forEach(r => {
@@ -2134,31 +2243,6 @@ function tabAssets(stage) {
       { label: 'Parts returned', value: nf(rows.filter(r => r[A.RET] > 0).length) },
     ]));
 
-    const notes = el('<div class="notes"></div>');
-    notes.appendChild(el(`<details class="notice"><summary><strong>Reading this tab</strong></summary>
-      <div>Figures are joined on the material record, the only key shared by purchase orders, receipts,
-      issue tickets and return notices. Headline figures count parts rather than summing quantities,
-      because quantities mix units of measure across rows. Use the <em>Line item type</em> filter to
-      separate physical materials from services, hire and lump sum lines, which are ordered but never
-      received into stock and would otherwise read as permanently outstanding.</div></details>`));
-
-    /* Open value is deliberately NOT a headline figure. Unit costs in the source
-       data are not consistently per-unit: several cable lines carry a per-drum
-       price against a quantity in metres, which inflates value by orders of
-       magnitude. Value is shown per row instead, beside quantity, unit and unit
-       cost, so it can be judged rather than trusted blindly. */
-    const rank = [...rows].map(r => Math.max(0, r[A.ORD] - r[A.RCV]) * (r[A.UC] || 0)).sort((a, b) => b - a);
-    const top10Share = rank.length && openValue > 0
-      ? (rank.slice(0, 10).reduce((a, v) => a + v, 0) / openValue * 100).toFixed(0) : '0';
-    notes.appendChild(el(`<details class="notice"><summary><strong>Open order value:
-      $${nf(Math.round(openValue))}, indicative only</strong></summary>
-      <div>Unit costs are not reliably per-unit in the source data. Several cable lines carry what looks
-      like a per-drum or per-reel price against a quantity in metres, which inflates their value by
-      orders of magnitude. The ten largest rows alone account for ${top10Share}% of this figure.
-      Sort the table by <em>Open value</em> to review the biggest contributors, and check
-      <em>Unit cost</em> against <em>Unit</em> before relying on any total. Correcting these in
-      Procore would make this figure dependable.</div></details>`));
-    host.appendChild(notes);
 
     // Counting outstanding parts per cost code is robust to the unit cost problem
     // described above; the value view sits beside it for review, not for totals.
@@ -2363,6 +2447,7 @@ function tabReceipts(stage) {
           cell: r => { const v = r[R.QTY] * (r[R.UC] || 0); return v ? '$' + nf(Math.round(v)) : '<span class="zero">0</span>'; } },
         { label: 'Project', value: r => PROJ[r[0]],
           cell: r => `<span class="clip" title="${esc(PROJ[r[0]])}">${esc(PROJ[r[0]])}</span>` },
+        ...(SERVER ? [commentColumn(COMMENT_KEYS.receipts, r => `${S(r[R.DOC])} · ${matName(r[1])}`)] : []),
       ], rows, { sortAt: 2, exportName: 'Receipts' })));
   }
   render();
@@ -2480,13 +2565,6 @@ function tabIssuing(stage) {
         { label: 'Project', value: r => PROJ[r[0]],
           cell: r => `<span class="clip" title="${esc(PROJ[r[0]])}">${esc(PROJ[r[0]])}</span>` },
       ], rows, { sortAt: 10, sortDir: -1, exportName: 'Issuing' })));
-
-    host.appendChild(el(`<p class="notice" style="margin-top:14px">
-      <strong>"Date raised" is the Issue Ticket's own created date, not SiteSense's "Approved Date".</strong>
-      SiteSense's native Issuing report shows a genuine Approved Date, but no field on this GraphQL API
-      matches it for the same ticket - every timestamp on the Issue Ticket, its Pick Ticket and its
-      Material Request was checked against the exact value the native report displayed. Rather than
-      guess, this column uses the one date confirmed against the ticket itself.</p>`));
   }
   render();
 }
@@ -2554,9 +2632,7 @@ function tabLedger(stage, domain) {
     const total = perType.reduce((a, t) => a + t.docs.length, 0);
 
     if (!total) {
-      host.appendChild(el(`<p class="notice">No documents match these filters. If no projects are
-        excluded, this module may simply not be in active use in SiteSense. Check whether it is
-        tracked elsewhere, for example in Procore.</p>`));
+      host.appendChild(el(`<p class="notice">No documents match these filters.</p>`));
       return;
     }
 
@@ -2663,18 +2739,6 @@ function tabRegions(stage) {
     if (!SERVER) bar.appendChild(dl);   // on the server every change is already saved for everyone
     host.appendChild(bar);
 
-    host.appendChild(el(`<div class="notes">
-      <p class="notice"><strong>Region is an RSGx overlay, not a SiteSense field.</strong>
-      SiteSense holds no east or west attribute, so this mapping is maintained here and applied to
-      every tab through the <em>Region</em> filter.</p>
-      ${SERVER
-        ? `<p class="notice"><strong>Changes are shared.</strong> Each change is saved straight away and
-           applies for everyone on their next page load, and survives refreshes and redeploys.</p>`
-        : `<p class="notice"><strong>${dirty ? 'You have unsaved changes for future refreshes.' : 'To keep changes permanently.'}</strong>
-           Edits apply immediately and are remembered in this browser. To survive the three-hourly refresh,
-           click <em>Download regions.json</em> and save it into the dashboard folder, replacing the file
-           there. The next refresh reads it and bakes the regions in for everyone.</p>`}
-    </div>`));
 
     const rows = D.projects.map((p, i) => ({ p, i }));
     host.appendChild(block('Project regions', 'Set each project to East or West. Blank means unassigned.',
@@ -2773,9 +2837,10 @@ function tabUsers(stage) {
     host.appendChild(strip([
       { label: 'Users', value: nf(users.length) },
       { label: 'Admins', value: nf(admins) },
-      { label: 'Viewers', value: nf(users.length - admins) },
-      { label: 'Viewers with no projects', value: nf(users.filter(u => u.role === 'viewer' && !u.projects.length).length),
-        flag: users.some(u => u.role === 'viewer' && !u.projects.length) },
+      { label: 'Standard', value: nf(users.filter(u => u.role === 'standard').length) },
+      { label: 'Viewers', value: nf(users.filter(u => u.role === 'viewer').length) },
+      { label: 'No projects assigned', value: nf(users.filter(u => u.role !== 'admin' && !u.projects.length).length),
+        flag: users.some(u => u.role !== 'admin' && !u.projects.length) },
     ]));
 
     if (notice) {
@@ -2792,12 +2857,13 @@ function tabUsers(stage) {
         <div class="field"><label for="nu-pass">Temporary password</label><input id="nu-pass" autocomplete="new-password" spellcheck="false"></div>
         <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-quiet" data-act="gen">Generate</button></div>
         <div class="field"><label for="nu-role">Role</label><select id="nu-role">
-          <option value="viewer">Viewer - sees assigned projects, read-only</option>
+          <option value="viewer">Viewer - assigned projects, read-only</option>
+          <option value="standard">Standard - assigned projects, can edit delivery dates</option>
           <option value="admin">Admin - every project, manages users</option></select></div>
         <div class="spacer"></div>
         <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-primary" data-act="add">Add user</button></div>
       </div>
-      <div class="nu-projects"><p class="hint">Projects this viewer can see:</p></div>
+      <div class="nu-projects"><p class="hint">Projects this user can see:</p></div>
     </section>`);
     const pass = add.querySelector('#nu-pass');
     const role = add.querySelector('#nu-role');
@@ -2832,17 +2898,17 @@ function tabUsers(stage) {
       const tr = el(`<table><tbody><tr>
         <td><strong>${esc(u.username)}</strong>${self ? ' <span class="zero">(you)</span>' : ''}</td>
         <td><select class="region-pick" aria-label="Role for ${esc(u.username)}">
-          ${['viewer', 'admin'].map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r === 'admin' ? 'Admin' : 'Viewer'}</option>`).join('')}
+          ${['viewer', 'standard', 'admin'].map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}
         </select></td>
         <td>${projects}</td>
         <td class="user-actions">
-          ${u.role === 'viewer' ? '<button type="button" class="btn btn-quiet" data-act="projects">Projects</button>' : ''}
+          ${u.role !== 'admin' ? '<button type="button" class="btn btn-quiet" data-act="projects">Projects</button>' : ''}
           <button type="button" class="btn btn-quiet" data-act="reset">Reset password</button>
           ${self ? '' : '<button type="button" class="btn btn-quiet btn-danger" data-act="remove">Remove</button>'}
         </td></tr></tbody></table>`).querySelector('tr');
       tr.querySelector('select').onchange = e => run(
         () => api('PUT', `/api/users/${encodeURIComponent(u.username)}`, { role: e.target.value }),
-        `${u.username} is now ${e.target.value === 'admin' ? 'an admin' : 'a viewer'}`)
+        `${u.username} is now ${e.target.value === 'admin' ? 'an admin' : e.target.value === 'standard' ? 'a standard user' : 'a viewer'}`)
         // Changing your own role changes what this page should show; reload into it.
         .then(ok => { if (ok && self) location.reload(); });
       const projBtn = tr.querySelector('[data-act="projects"]');
@@ -2919,7 +2985,7 @@ const TABS = [
     lede: 'Assign each project to the east or west coast. This mapping is maintained here, not in SiteSense, and drives the Region filter on every other tab.',
     mount: tabRegions },
   { id: 'users', title: 'Users', config: true, adminOnly: true, serverOnly: true,
-    lede: 'Who can sign in, what they can do, and which projects each viewer can see. Admins see every project.',
+    lede: 'Who can sign in and which projects they see. Viewers are read-only; Standard users can also edit delivery dates; Admins see every project and manage users. Everyone can comment.',
     mount: tabUsers },
 ];
 // Viewers never get the admin tabs; the Users tab only exists on the server,
@@ -2935,7 +3001,6 @@ function openTab(id) {
     b.setAttribute('aria-selected', String(b.dataset.id === id)));
   const stage = document.getElementById('stage');
   stage.textContent = '';
-  stage.appendChild(el(`<p class="lede">${esc(tab.lede)}</p>`));
   tab.mount(stage);
   location.hash = id;
 }
@@ -3063,7 +3128,7 @@ function initUserBox() {
   const box = document.getElementById('userBox');
   box.hidden = false;
   box.innerHTML = `<span class="user-name" title="Signed in">${esc(SERVER.username)}
-      <span class="user-role">${SERVER.role === 'admin' ? 'Admin' : 'Viewer'}</span></span>
+      <span class="user-role">${ROLE_LABEL[SERVER.role] || SERVER.role}</span></span>
     <button type="button" class="btn btn-quiet" id="pwOpen">Change password</button>
     <form method="post" action="/logout"><button type="submit" class="btn btn-quiet">Sign out</button></form>`;
 

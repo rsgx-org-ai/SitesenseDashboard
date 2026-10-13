@@ -7,9 +7,12 @@ user's `session_version`, so resetting a password or deleting a user logs that
 user out everywhere immediately.
 
 Roles:
-    admin  - sees every project, manages users, triggers refreshes, edits the
-             shared Regions and delivery-date overlays
-    viewer - sees only the projects assigned to them, read-only
+    admin    - sees every project, manages users, triggers refreshes, edits the
+               shared Regions and delivery-date overlays
+    standard - sees only the projects assigned to them; can also edit their
+               projects' Estimated/Promised Delivery Dates
+    viewer   - sees only the projects assigned to them, read-only
+Every role can comment on rows it can see.
 """
 import base64
 import hashlib
@@ -20,7 +23,7 @@ import secrets
 import threading
 import time
 
-ROLES = ("admin", "viewer")
+ROLES = ("admin", "standard", "viewer")
 ITERATIONS = 260_000
 SESSION_DAYS = 7
 MIN_PASSWORD = 10
@@ -170,7 +173,7 @@ class UserStore:
         if not key or any(c in key for c in "|:/\\ ") or len(key) > 64:
             raise UserError("Username must be 1-64 characters with no spaces or |, :, / or \\.")
         if role not in ROLES:
-            raise UserError("Role must be admin or viewer.")
+            raise UserError("Role must be admin, standard or viewer.")
         check_password_strength(password)
         with self._lock:
             users = self._read()
@@ -195,7 +198,7 @@ class UserStore:
                 raise UserError(f"No user called {username}.")
             if role is not None:
                 if role not in ROLES:
-                    raise UserError("Role must be admin or viewer.")
+                    raise UserError("Role must be admin, standard or viewer.")
                 if u["role"] == "admin" and role != "admin" and self._admin_count(users) == 1:
                     raise UserError("This is the only admin. Make someone else an admin first.")
                 u["role"] = role
