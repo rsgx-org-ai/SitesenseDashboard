@@ -26,7 +26,7 @@ import time
 ROLES = ("admin", "standard", "viewer")
 ITERATIONS = 260_000
 SESSION_DAYS = 7
-MIN_PASSWORD = 10
+MIN_PASSWORD = 6
 LOCKOUT_FAILURES = 8
 LOCKOUT_SECONDS = 10 * 60
 
@@ -40,10 +40,10 @@ def _hash(password, salt, iterations=ITERATIONS):
 
 
 def check_password_strength(password):
+    # Deliberately light (RSGx's call): just long enough not to be blank or trivial.
+    # The sign-in lockout is what stops guessing.
     if len(password) < MIN_PASSWORD:
         raise UserError(f"Password must be at least {MIN_PASSWORD} characters.")
-    if len(set(password)) < 4:
-        raise UserError("Password is too repetitive - use a mix of characters or a passphrase.")
 
 
 class UserStore:
@@ -98,6 +98,8 @@ class UserStore:
                 "username": username.strip(), "role": "admin", "projects": [],
                 "salt": salt.hex(), "hash": _hash(password, salt), "iterations": ITERATIONS,
                 "session_version": 1, "created_at": int(time.time()),
+                # The Railway-variable password is a starting point, not one to keep.
+                "must_change_password": True,
             }})
             return True
 
@@ -108,7 +110,8 @@ class UserStore:
         return dict(u) if u else None
 
     def public(self, u):
-        return {"username": u["username"], "role": u["role"], "projects": u.get("projects", [])}
+        return {"username": u["username"], "role": u["role"], "projects": u.get("projects", []),
+                "must_change_password": bool(u.get("must_change_password"))}
 
     def list_public(self):
         with self._lock:
@@ -186,11 +189,16 @@ class UserStore:
                 "projects": [] if role == "admin" else sorted({int(p) for p in projects}),
                 "salt": salt.hex(), "hash": _hash(password, salt), "iterations": ITERATIONS,
                 "session_version": 1, "created_at": int(time.time()),
+                # Admin-set passwords are temporary: the user must choose their own
+                # on first sign-in before they can see anything (server.py enforces).
+                "must_change_password": True,
             }
             self._write(users)
             return self.public(users[key])
 
-    def update(self, username, role=None, projects=None, password=None):
+    def update(self, username, role=None, projects=None, password=None, temporary=True):
+        """`temporary`: a password set here by an admin must be changed at next
+        sign-in; change_own_password passes False when the user picks their own."""
         key = self._key(username)
         with self._lock:
             users = self._read()
@@ -210,7 +218,8 @@ class UserStore:
             if password is not None:
                 check_password_strength(password)
                 salt = secrets.token_bytes(16)
-                u.update(salt=salt.hex(), hash=_hash(password, salt), iterations=ITERATIONS)
+                u.update(salt=salt.hex(), hash=_hash(password, salt), iterations=ITERATIONS,
+                         must_change_password=temporary)
             if password is not None or role is not None:
                 # Signs this user out of every browser; the acting admin gets a fresh cookie.
                 u["session_version"] = u.get("session_version", 1) + 1
@@ -234,4 +243,6 @@ class UserStore:
         if not u or not hmac.compare_digest(
                 _hash(current, bytes.fromhex(u["salt"]), u["iterations"]), u["hash"]):
             raise UserError("Current password is incorrect.")
-        return self.update(username, password=new)
+        if hmac.compare_digest(current, new):
+            raise UserError("Choose a new password - it can't be the same as the current one.")
+        return self.update(username, password=new, temporary=False)

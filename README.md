@@ -118,8 +118,12 @@ need the server, so the local desktop copy doesn't show them.
   `data_filter.py` being updated to match, viewers get an "unavailable" page
   rather than a possibly-leaky one.
 - **Passwords** are stored only as salted PBKDF2 hashes in `users.json` on the
-  Volume. New passwords must be 10+ characters. Eight failed sign-ins lock an
+  Volume. Passwords need at least 6 characters. Eight failed sign-ins lock an
   account for 10 minutes.
+- **Temporary passwords.** A password set by an admin (a new user, or a reset) is
+  temporary: at the next sign-in the user is taken straight to a "Choose a new
+  password" page and can't use the dashboard until they do. The first admin
+  created from `DASHBOARD_PASSWORD` is treated the same way.
 - **Sessions** last 7 days. Resetting a user's password, changing their role or
   removing them signs them out everywhere immediately.
 - Regions and delivery dates edited by an admin are saved on the server and

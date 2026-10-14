@@ -275,6 +275,28 @@ def login_page(error="", username=""):
 <button type="submit">Sign in</button></form>""")
 
 
+def change_password_page(user, error=""):
+    err = f'<div class="err">{escape(error)}</div>' if error else ""
+    forced = user.get("must_change_password")
+    intro = ("You're signed in with a temporary password. Choose your own to continue."
+             if forced else "Choose a new password.")
+    cancel = "" if forced else '<p class="note" style="margin-top:14px"><a href="/">Back to the dashboard</a></p>'
+    return shell(f"""<h1><span class="rule"></span>Choose a new password</h1>
+<p class="sub">Signed in as <b>{escape(user['username'])}</b>. {intro}</p>{err}
+<form method="post" action="/change-password" autocomplete="on">
+<input type="text" name="username" value="{escape(user['username'])}" autocomplete="username" hidden>
+<label for="c">{'Temporary password' if forced else 'Current password'}</label>
+<input id="c" name="current" type="password" autocomplete="current-password" required autofocus>
+<label for="n">New password</label>
+<input id="n" name="new" type="password" autocomplete="new-password" minlength="6" required>
+<label for="r">Confirm new password</label>
+<input id="r" name="confirm" type="password" autocomplete="new-password" minlength="6" required>
+<p class="note" style="margin:10px 0 0">At least 6 characters.</p>
+<button type="submit">Save password and continue</button></form>
+<form method="post" action="/logout"><button type="submit"
+ style="background:transparent;color:var(--ink2);border:1px solid var(--rule);margin-top:10px">Sign out</button></form>{cancel}""")
+
+
 def message_page(title, text, auto_refresh=False):
     return shell(f'<h1><span class="rule"></span>{escape(title)}</h1><p class="note">{text}</p>'
                  '<form method="post" action="/logout"><button type="submit" '
@@ -353,6 +375,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "GET" and self.headers.get("X-Requested-With") != "dashboard":
             self._json(403, {"error": "Missing request header."})
             return None
+        if user.get("must_change_password"):
+            # Nothing works on a temporary password except choosing a new one.
+            self._json(403, {"error": "Choose a new password first - reload the page."})
+            return None
         if admin and user["role"] != "admin":
             self._json(403, {"error": "Admins only."})
             return None
@@ -378,11 +404,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, login_page())
         if path == "/healthz":
             return self._send(200, b"ok", "text/plain")
+        if path == "/change-password":
+            user = self._user()
+            if not user:
+                return self._redirect("/login")
+            return self._send(200, change_password_page(user))
 
         if path in ("/", "/index.html"):
             user = self._user()
             if not user:
                 return self._redirect("/login")
+            if user.get("must_change_password"):
+                return self._redirect("/change-password")
             if user["role"] != "admin" and not user.get("projects"):
                 return self._send(200, message_page(
                     "No projects assigned yet",
@@ -441,6 +474,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._login()
             if path == "/logout":
                 return self._redirect("/login", [self._clear_cookie()])
+            if path == "/change-password":
+                return self._change_password_form()
             if path == "/refresh":
                 if self._api_guard(admin=True):
                     started = start_refresh()
@@ -537,7 +572,25 @@ class Handler(BaseHTTPRequestHandler):
             msg = (f"Too many failed attempts. Try again in {max(1, wait // 60)} minute(s)."
                    if wait else "Incorrect username or password.")
             return self._send(401, login_page(msg, username))
-        self._redirect("/", [self._session_cookie(user)])
+        # A temporary (admin-set) password goes straight to choosing a new one.
+        self._redirect("/change-password" if user.get("must_change_password") else "/",
+                       [self._session_cookie(user)])
+
+    def _change_password_form(self):
+        user = self._user()
+        if not user:
+            return self._redirect("/login")
+        form = parse_qs(self._body().decode("utf-8", "replace"))
+        current = (form.get("current") or [""])[0]
+        new = (form.get("new") or [""])[0]
+        if new != (form.get("confirm") or [""])[0]:
+            return self._send(400, change_password_page(user, "The new passwords don't match."))
+        try:
+            updated = store.change_own_password(user["username"], current, new)
+        except UserError as exc:
+            print(f"!! POST /change-password rejected for {user['username']}: {exc}")
+            return self._send(400, change_password_page(user, str(exc)))
+        self._redirect("/", [self._session_cookie(updated)])
 
     def _save_regions(self, body):
         known = {str(p["id"]) for p in project_catalog()}

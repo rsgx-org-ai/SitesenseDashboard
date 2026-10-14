@@ -469,10 +469,10 @@
     <div class="field"><label for="pwCurrent">Current password</label>
       <input id="pwCurrent" type="password" autocomplete="current-password" required></div>
     <div class="field"><label for="pwNew">New password</label>
-      <input id="pwNew" type="password" autocomplete="new-password" minlength="10" required></div>
+      <input id="pwNew" type="password" autocomplete="new-password" minlength="6" required></div>
     <div class="field"><label for="pwConfirm">Confirm new password</label>
-      <input id="pwConfirm" type="password" autocomplete="new-password" minlength="10" required></div>
-    <p class="hint">At least 10 characters. A few random words make a strong, memorable password.</p>
+      <input id="pwConfirm" type="password" autocomplete="new-password" minlength="6" required></div>
+    <p class="hint">At least 6 characters.</p>
     <p class="pw-error" id="pwError" role="alert"></p>
     <div class="pw-actions">
       <button type="button" class="btn btn-quiet" id="pwCancel">Cancel</button>
@@ -2844,8 +2844,8 @@ function tabUsers(stage) {
 
     if (notice) {
       host.appendChild(el(`<div class="notice user-secret"><strong>${esc(notice.title)}</strong><br>
-        Share it with them directly (not by email or chat if you can avoid it). It is shown once;
-        they can change it under <em>Change password</em> after signing in.
+        Share it with them directly (not by email or chat if you can avoid it). It is shown once.
+        When they first sign in with it, they'll be asked to choose their own password before they can continue.
         <code>${esc(notice.password)}</code></div>`));
     }
 
@@ -2853,7 +2853,7 @@ function tabUsers(stage) {
     const add = el(`<section class="block user-add"><h3>Add a user</h3>
       <div class="rail">
         <div class="field"><label for="nu-name">Username</label><input id="nu-name" autocomplete="off" spellcheck="false" placeholder="e.g. Jo Smith"></div>
-        <div class="field"><label for="nu-pass">Temporary password</label><input id="nu-pass" autocomplete="new-password" spellcheck="false" placeholder="10+ characters, or Generate"></div>
+        <div class="field"><label for="nu-pass">Temporary password</label><input id="nu-pass" autocomplete="new-password" spellcheck="false" placeholder="6+ characters, or Generate"></div>
         <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-quiet" data-act="gen">Generate</button></div>
         <div class="field"><label for="nu-role">Role</label><select id="nu-role">
           <option value="viewer">Viewer - assigned projects, read-only</option>
@@ -2881,7 +2881,7 @@ function tabUsers(stage) {
       const password = pass.value;
       const projects = role.value === 'admin' ? [] : picker.value();
       if (!username) { errBox.textContent = 'Enter a username.'; return; }
-      if (password.length < 10) { errBox.textContent = 'The temporary password must be at least 10 characters - or click Generate.'; return; }
+      if (password.length < 6) { errBox.textContent = 'The temporary password must be at least 6 characters - or click Generate.'; return; }
       if (role.value !== 'admin' && !projects.length &&
           !confirm(`${username} has no projects ticked, so they won't see any data until you assign some. Add them anyway?`)) return;
       errBox.textContent = '';
@@ -2907,7 +2907,8 @@ function tabUsers(stage) {
             <span class="sub clip">${esc(u.projects.map(nameOf).join(', '))}</span>`
         : '<span class="dot dot-alert">None assigned</span>';
       const tr = el(`<table><tbody><tr>
-        <td><strong>${esc(u.username)}</strong>${self ? ' <span class="zero">(you)</span>' : ''}</td>
+        <td><strong>${esc(u.username)}</strong>${self ? ' <span class="zero">(you)</span>' : ''}
+          ${u.must_change_password ? '<span class="sub" title="Still on the temporary password an admin set - they will be asked to choose their own at next sign-in">Temporary password</span>' : ''}</td>
         <td><select class="region-pick" aria-label="Role for ${esc(u.username)}">
           ${['viewer', 'standard', 'admin'].map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}
         </select></td>
