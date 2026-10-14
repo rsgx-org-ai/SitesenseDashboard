@@ -358,6 +358,11 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return user
 
+    def _reject(self, exc):
+        # Logged so a rejected request can be diagnosed later; messages never include passwords.
+        print(f"!! {self.command} {urlparse(self.path).path} rejected: {exc}")
+        self._json(400, {"error": str(exc)})
+
     def log_message(self, fmt, *args):
         print(f"{self.address_string()} - {fmt % args}")
 
@@ -463,7 +468,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._json(404, {"error": "not found"})
         except UserError as exc:
-            self._json(400, {"error": str(exc)})
+            self._reject(exc)
 
     def do_PUT(self):
         path = urlparse(self.path).path
@@ -494,7 +499,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._json(404, {"error": "not found"})
         except UserError as exc:
-            self._json(400, {"error": str(exc)})
+            self._reject(exc)
 
     def do_DELETE(self):
         path = urlparse(self.path).path
@@ -515,7 +520,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._json(404, {"error": "not found"})
         except UserError as exc:
-            self._json(400, {"error": str(exc)})
+            self._reject(exc)
 
     # -- actions
     def _login(self):

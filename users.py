@@ -77,7 +77,8 @@ class UserStore:
 
     @staticmethod
     def _key(username):
-        return (username or "").strip().lower()
+        # Case- and spacing-insensitive, so "Jo  Smith" signs in as "jo smith".
+        return " ".join((username or "").split()).lower()
 
     def has_users(self):
         with self._lock:
@@ -168,10 +169,10 @@ class UserStore:
         return sum(1 for u in users.values() if u["role"] == "admin")
 
     def create(self, username, password, role, projects):
-        username = (username or "").strip()
+        username = " ".join((username or "").split())   # full names like "Jo Smith" are fine
         key = self._key(username)
-        if not key or any(c in key for c in "|:/\\ ") or len(key) > 64:
-            raise UserError("Username must be 1-64 characters with no spaces or |, :, / or \\.")
+        if not key or len(key) > 64 or any(c in key for c in "|:/\\") or not key.isprintable():
+            raise UserError("Username must be 1-64 characters and can't contain |, :, / or \\.")
         if role not in ROLES:
             raise UserError("Role must be admin, standard or viewer.")
         check_password_strength(password)

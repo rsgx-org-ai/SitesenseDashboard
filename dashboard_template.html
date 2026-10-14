@@ -2853,8 +2853,8 @@ function tabUsers(stage) {
     // ---- add a user
     const add = el(`<section class="block user-add"><h3>Add a user</h3>
       <div class="rail">
-        <div class="field"><label for="nu-name">Username</label><input id="nu-name" autocomplete="off" spellcheck="false"></div>
-        <div class="field"><label for="nu-pass">Temporary password</label><input id="nu-pass" autocomplete="new-password" spellcheck="false"></div>
+        <div class="field"><label for="nu-name">Username</label><input id="nu-name" autocomplete="off" spellcheck="false" placeholder="e.g. Jo Smith"></div>
+        <div class="field"><label for="nu-pass">Temporary password</label><input id="nu-pass" autocomplete="new-password" spellcheck="false" placeholder="10+ characters, or Generate"></div>
         <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-quiet" data-act="gen">Generate</button></div>
         <div class="field"><label for="nu-role">Role</label><select id="nu-role">
           <option value="viewer">Viewer - assigned projects, read-only</option>
@@ -2863,6 +2863,7 @@ function tabUsers(stage) {
         <div class="spacer"></div>
         <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-primary" data-act="add">Add user</button></div>
       </div>
+      <p class="pw-error nu-error" role="alert"></p>
       <div class="nu-projects"><p class="hint">Projects this user can see:</p></div>
     </section>`);
     const pass = add.querySelector('#nu-pass');
@@ -2872,14 +2873,25 @@ function tabUsers(stage) {
     projWrap.appendChild(picker);
     const syncRole = () => { projWrap.hidden = role.value === 'admin'; };
     role.onchange = syncRole; syncRole();
-    add.querySelector('[data-act="gen"]').onclick = () => { pass.value = makeTempPassword(); };
-    add.querySelector('[data-act="add"]').onclick = () => {
-      const username = add.querySelector('#nu-name').value.trim(), password = pass.value;
-      run(async () => {
-        await api('POST', '/api/users', { username, password, role: role.value,
-                                          projects: role.value === 'admin' ? [] : picker.value() });
-        notice = { title: `Temporary password for ${username}:`, password };
-      }, `Added ${username}`);
+    const errBox = add.querySelector('.nu-error');
+    add.querySelector('[data-act="gen"]').onclick = () => { pass.value = makeTempPassword(); errBox.textContent = ''; };
+    // Errors stay on screen under the form and nothing typed is lost; the
+    // form is only rebuilt once the user has actually been created.
+    add.querySelector('[data-act="add"]').onclick = async () => {
+      const username = add.querySelector('#nu-name').value.trim().replace(/\s+/g, ' ');
+      const password = pass.value;
+      const projects = role.value === 'admin' ? [] : picker.value();
+      if (!username) { errBox.textContent = 'Enter a username.'; return; }
+      if (password.length < 10) { errBox.textContent = 'The temporary password must be at least 10 characters - or click Generate.'; return; }
+      if (role.value !== 'admin' && !projects.length &&
+          !confirm(`${username} has no projects ticked, so they won't see any data until you assign some. Add them anyway?`)) return;
+      errBox.textContent = '';
+      try {
+        await api('POST', '/api/users', { username, password, role: role.value, projects });
+      } catch (err) { errBox.textContent = `Couldn't add ${username}: ${err.message}`; return; }
+      notice = { title: `Temporary password for ${username}:`, password };
+      toast(`Added ${username}`, 'ok');
+      await load();
     };
     host.appendChild(add);
 
