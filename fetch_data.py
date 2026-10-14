@@ -1,4 +1,4 @@
-"""Pull SiteSense data for the RSGx PMO Dashboard and bake it into PMO_Dashboard.html.
+"""Pull SiteSense data for the Sitesense Dashboard and bake it into Sitesense_Dashboard.html.
 
 Run this whenever you want fresh numbers:
     python fetch_data.py
@@ -6,7 +6,7 @@ Run this whenever you want fresh numbers:
 Reads credentials from environment variables (SITESENSE_API_ENDPOINT,
 SITESENSE_AUTH_HEADER) if set - the Railway deployment path - falling back to
 config.json in this folder for local use, unchanged from before. Writes
-PMO_Dashboard.html, a self-contained file you open directly in a browser. No
+Sitesense_Dashboard.html, a self-contained file you open directly in a browser. No
 server needed for local use, and the API key never touches that file.
 
 Data is emitted at MATERIAL level (not just project totals) so every dashboard
@@ -35,7 +35,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # A manual refresh (the dashboard's "Refresh data" button, via refresh_server.py
 # locally or server.py on Railway) can land at almost the same moment as the
-# scheduled run. Two processes writing PMO_Dashboard.html at once would
+# scheduled run. Two processes writing Sitesense_Dashboard.html at once would
 # interleave and corrupt it, so the second one backs off instead. The lock is
 # age-based rather than PID-based because reliably checking whether a PID is
 # still alive is not portable on Windows; a run this size never legitimately
@@ -50,7 +50,7 @@ def acquire_lock():
         if age < LOCK_STALE_SECONDS:
             print(f"Another fetch_data.py run appears to be in progress "
                   f"(lock is {int(age)}s old). Exiting rather than risk "
-                  f"interleaved writes to PMO_Dashboard.html. If that run has "
+                  f"interleaved writes to Sitesense_Dashboard.html. If that run has "
                   f"actually died, delete {LOCK_FILE.name} and try again.")
             raise SystemExit(0)
         print(f"Found a stale lock ({int(age)}s old) - a previous run likely "
@@ -864,7 +864,7 @@ def _main():
         "/*__SITESENSE_DATA__*/",
         "const SITESENSE_DATA = " + json.dumps(data, separators=(",", ":")) + ";",
     )
-    out_path = DATA_DIR / "PMO_Dashboard.html"
+    out_path = DATA_DIR / "Sitesense_Dashboard.html"
     out_path.write_text(output, encoding="utf-8")
     print(f"Wrote {out_path} ({out_path.stat().st_size:,} bytes)")
 
@@ -883,7 +883,7 @@ def _main():
     ]) + "\n"
     if AUTH_HEADER in artifact or "gateway.sitesensecloud" in artifact:
         raise SystemExit("Refusing to write the artifact copy: it contains credentials.")
-    art_path = DATA_DIR / "PMO_Dashboard_artifact.html"
+    art_path = DATA_DIR / "Sitesense_Dashboard_artifact.html"
     art_path.write_text(artifact, encoding="utf-8")
     print(f"Wrote {art_path} ({art_path.stat().st_size:,} bytes, publish-ready)")
 

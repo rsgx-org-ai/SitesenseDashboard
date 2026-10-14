@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RSGx PMO Dashboard | SiteSense</title>
+<title>Sitesense Dashboard</title>
 <style>
   /* Neutrals are tinted toward the RSGx red hue (~27) rather than pure grey,
      so the whole surface reads as one family. No pure black or white anywhere. */
@@ -453,8 +453,7 @@
 <header class="masthead">
   <div class="wordmark">
     <span class="rule" aria-hidden="true"></span>
-    <h1>RSGx PMO Dashboard</h1>
-    <span>SiteSense</span>
+    <h1>Sitesense Dashboard</h1>
   </div>
   <div class="refresh-group">
     <p class="stamp" id="stamp"></p>
@@ -3020,8 +3019,8 @@ function openTab(id) {
 // ---------------------------------------------------------------- refresh button
 /* Talks to refresh_server.py on localhost so the dashboard can pull fresh
    SiteSense data on demand instead of waiting for the scheduled run. That
-   helper is a separate always-on process (see the "RSGx PMO Dashboard
-   Refresh Server" scheduled task); if it is not running, the calls below
+   helper is a separate always-on process (see the "Sitesense Dashboard
+   Refresh Helper" startup shortcut); if it is not running, the calls below
    simply fail to connect and the button says so, rather than doing nothing
    silently. On the hosted artifact link this will always fail to connect,
    because the viewer's browser has no route to someone else's PC - that is

@@ -1,8 +1,8 @@
 """Local helper that lets the dashboard's "Refresh data" button pull fresh
 SiteSense data on demand, without waiting for the 6am scheduled task.
 
-Runs once per Windows login (see the "RSGx PMO Dashboard Refresh Server"
-scheduled task) and listens on 127.0.0.1 only - never reachable from another
+Runs once per Windows login (see the "Sitesense Dashboard Refresh Helper"
+shortcut in the Windows Startup folder) and listens on 127.0.0.1 only - never reachable from another
 machine. It exposes two endpoints:
 
     GET  /status   -> current state as JSON

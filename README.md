@@ -1,4 +1,4 @@
-# RSGx PMO Dashboard
+# Sitesense Dashboard
 
 A SiteSense data dashboard: pulls Purchase Orders, Receipts, Inventory, Storage,
 Transfers, Asset Tracking, FIM and Issuing data across every RSGx project into
@@ -9,7 +9,7 @@ There are two ways this runs, and both read the same `fetch_data.py` and
 `dashboard_template.html`:
 
 - **Local (Windows desktop)** - unchanged, still works exactly as before.
-  `fetch_data.py` writes `PMO_Dashboard.html` next to itself; you open it
+  `fetch_data.py` writes `Sitesense_Dashboard.html` next to itself; you open it
   straight off disk. `refresh_server.py` is a small local helper (started at
   login, see below) that the dashboard's "Refresh data" button talks to on
   `127.0.0.1:8799`.
@@ -24,7 +24,7 @@ There are two ways this runs, and both read the same `fetch_data.py` and
    `auth_header_value`. **Never commit `config.json`** - it holds the live
    SiteSense credentials and is gitignored for exactly that reason.
 2. Double-click `Launch Dashboard.bat`. It starts `refresh_server.py` if it
-   is not already running, then opens `PMO_Dashboard.html`.
+   is not already running, then opens `Sitesense_Dashboard.html`.
 3. To pull fresh data without the button, run `python fetch_data.py` directly.
 
 The existing daily 6am Task Scheduler job and the Startup-folder shortcut for
@@ -44,7 +44,7 @@ git push -u origin main
 ```
 
 Before that first commit, double check `git status` does **not** list
-`config.json`, `data.json`, `PMO_Dashboard.html`, `PMO_Dashboard_artifact.html`,
+`config.json`, `data.json`, `Sitesense_Dashboard.html`, `Sitesense_Dashboard_artifact.html`,
 `regions.json` or `delivery_dates.json` - `.gitignore` already excludes all of
 them, but it is worth a glance, especially if any of them were ever added to
 git before this file existed. If one was committed previously, removing it
@@ -174,4 +174,4 @@ this way; the data itself refreshes on its own daily schedule or via the
 | `regions.json`, `delivery_dates.json` | Manually-entered overlays, not derived from SiteSense |
 | `users.json`, `.session_secret` | Accounts and cookie-signing key (on the Volume, gitignored) |
 | `comments.json` | Row comments (on the Volume, gitignored) |
-| `data.json`, `PMO_Dashboard*.html` | Generated output, gitignored, rebuilt by `fetch_data.py` |
+| `data.json`, `Sitesense_Dashboard*.html` | Generated output, gitignored, rebuilt by `fetch_data.py` |

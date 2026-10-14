@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-rem Launches the PMO Dashboard and makes sure the local refresh helper is
+rem Launches the Sitesense Dashboard and makes sure the local refresh helper is
 rem running first, since the "Refresh data" button silently fails to reach it
 rem if it isn't. The Startup-folder shortcut normally starts the helper at
 rem login already; this check exists for the times it doesn't - after a
@@ -21,7 +21,7 @@ if %ERRORLEVEL% NEQ 0 (
     echo   Already running.
 )
 
-echo Opening PMO_Dashboard.html...
-start "" "%~dp0PMO_Dashboard.html"
+echo Opening Sitesense_Dashboard.html...
+start "" "%~dp0Sitesense_Dashboard.html"
 
 endlocal

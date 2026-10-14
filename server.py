@@ -240,7 +240,7 @@ def build_page(user):
 # --------------------------------------------------------------- page shells
 SHELL = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RSGx PMO Dashboard</title>{refresh}
+<title>Sitesense Dashboard</title>{refresh}
 <style>
 :root{{color-scheme:light dark;--bg:#fbfaf9;--ink:#2a2523;--ink2:#6b625e;--rule:#e2dcd8;--accent:#c8102e;--card:#fff}}
 @media (prefers-color-scheme:dark){{:root{{--bg:#1d1a19;--ink:#f3efed;--ink2:#b3aaa6;--rule:#3b3533;--card:#262221}}}}
@@ -267,8 +267,8 @@ def login_page(error="", username=""):
         err = ('<div class="err">No accounts exist yet. Set <b>DASHBOARD_USER</b> and '
                '<b>DASHBOARD_PASSWORD</b> in Railway\'s Variables tab to create the first '
                'admin, then reload.</div>')
-    return shell(f"""<h1><span class="rule"></span>RSGx PMO Dashboard</h1>
-<p class="sub">SiteSense - sign in to continue</p>{err}
+    return shell(f"""<h1><span class="rule"></span>Sitesense Dashboard</h1>
+<p class="sub">Sign in to continue</p>{err}
 <form method="post" action="/login" autocomplete="on">
 <label for="u">Username</label><input id="u" name="username" value="{escape(username)}" autocomplete="username" required autofocus>
 <label for="p">Password</label><input id="p" name="password" type="password" autocomplete="current-password" required>
