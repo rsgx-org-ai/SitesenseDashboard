@@ -34,8 +34,9 @@ is created from DASHBOARD_USER / DASHBOARD_PASSWORD; after that, users are
 managed from the Users tab and those variables are ignored. With neither, the
 server refuses all sign-ins rather than running open.
 
-Also runs the daily refresh in-process (REFRESH_HOUR_UTC, default 22 UTC ~= 6am
-AWST), since Railway has no Windows Task Scheduler.
+Also runs the scheduled refresh in-process, since Railway has no Windows Task
+Scheduler: every REFRESH_EVERY_HOURS hours (default 3), counted from
+REFRESH_HOUR_UTC (default 22 UTC = 6am AWST) - so 6am, 9am, 12pm... Perth time.
 """
 import json
 import os
@@ -61,6 +62,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 PORT = int(os.environ.get("PORT", "8080"))
 REFRESH_HOUR_UTC = int(os.environ.get("REFRESH_HOUR_UTC", "22"))
+REFRESH_EVERY_HOURS = max(1, int(os.environ.get("REFRESH_EVERY_HOURS", "3")))
 COOKIE = "ssd_session"
 MAX_BODY = 1_000_000
 MAX_TAIL = 40
@@ -114,14 +116,25 @@ def start_refresh():
     return True
 
 
-def _daily_scheduler():
+def next_refresh_time(now):
+    """The next slot on the grid REFRESH_HOUR_UTC + k * REFRESH_EVERY_HOURS."""
+    step = timedelta(hours=REFRESH_EVERY_HOURS)
+    anchor = now.replace(hour=REFRESH_HOUR_UTC, minute=0, second=0, microsecond=0)
+    while anchor > now:          # step the anchor back before now...
+        anchor -= step
+    while anchor <= now:         # ...then forward to the first slot after it
+        anchor += step
+    return anchor
+
+
+def _scheduler():
     while True:
         now = datetime.now(timezone.utc)
-        target = now.replace(hour=REFRESH_HOUR_UTC, minute=0, second=0, microsecond=0)
-        if target <= now:
-            target += timedelta(days=1)
+        target = next_refresh_time(now)
+        print(f"[scheduler] next refresh {target:%Y-%m-%d %H:%M} UTC (every {REFRESH_EVERY_HOURS}h)")
         time.sleep(max(1.0, (target - now).total_seconds()))
-        print(f"[scheduler] daily refresh ({REFRESH_HOUR_UTC}:00 UTC)")
+        # If the previous pull is somehow still running, this one is skipped
+        # rather than overlapping it (_run_fetch checks).
         _run_fetch()
 
 
@@ -679,7 +692,7 @@ def main():
     if not store.has_users():
         print("!! No user accounts and no DASHBOARD_USER/DASHBOARD_PASSWORD set - every sign-in "
               "will be refused until they are.")
-    threading.Thread(target=_daily_scheduler, daemon=True).start()
+    threading.Thread(target=_scheduler, daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     print(f"Listening on 0.0.0.0:{PORT} (data dir {DATA_DIR})")
     server.serve_forever()

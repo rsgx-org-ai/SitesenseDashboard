@@ -75,7 +75,8 @@ the sensible default regardless of what protects the *hosted* copy.
    | `DASHBOARD_USER` | username for the **first admin** account |
    | `DASHBOARD_PASSWORD` | password for the first admin (change it after signing in) |
    | `DATA_DIR` | `/data` (must match the Volume's mount path from step 2) |
-   | `REFRESH_HOUR_UTC` | optional, defaults to `22` (≈ 6am AWST) |
+   | `REFRESH_EVERY_HOURS` | optional, defaults to `3` (8 refreshes a day) |
+   | `REFRESH_HOUR_UTC` | optional; the hour the 3-hourly grid starts from, defaults to `22` (= 6am AWST) |
    | `SESSION_SECRET` | optional; signs login cookies. If unset, one is generated and kept on the Volume |
 
    Railway sets `PORT` itself - do not add it yourself.
@@ -102,7 +103,7 @@ Everyone signs in on a login page. There are three roles:
 | Delete comments | Anyone's | Their own | Their own |
 | Edit Regions | Yes | No | No |
 | Users tab (add/remove users, roles, projects, password resets) | Yes | No | No |
-| Refresh data button | Yes | No | No (data still refreshes daily) |
+| Refresh data button | Yes | No | No (data still refreshes every 3 hours) |
 
 Comments are threads per row, with author and time, saved in `comments.json`
 on the Volume. The server checks the row's project on every read and write,
@@ -143,7 +144,7 @@ wait before anyone can see anything).
 
 Railway redeploys automatically on every push to the branch it is watching
 (usually `main`). Code changes (template, `fetch_data.py`, `server.py`) ship
-this way; the data itself refreshes on its own daily schedule or via the
+this way; the data itself refreshes every 3 hours on its own (6am, 9am, 12pm... Perth time) or via the
 "Refresh data" button, independent of deploys.
 
 ## What changed to make this possible
@@ -160,7 +161,7 @@ this way; the data itself refreshes on its own daily schedule or via the
   both `refresh_server.py` locally and `server.py` on Railway.
 - `server.py` is Railway-only: it handles sign-in and roles, builds each
   user's page from `data.json` filtered to their projects, serves the admin
-  APIs, and runs the daily refresh in-process since Railway has no Task
+  APIs, and runs the 3-hourly refresh in-process since Railway has no Task
   Scheduler equivalent. `refresh_server.py` is untouched.
 
 ## Files
@@ -170,7 +171,7 @@ this way; the data itself refreshes on its own daily schedule or via the
 | `fetch_data.py` | Pulls SiteSense data, writes `data.json` + the built dashboard |
 | `dashboard_template.html` | The dashboard's HTML/CSS/JS, data-free |
 | `refresh_server.py` | Local-only refresh helper (Windows desktop workflow) |
-| `server.py` | Hosted web server for Railway (sign-in, per-user pages, admin APIs, daily refresh) |
+| `server.py` | Hosted web server for Railway (sign-in, per-user pages, admin APIs, 3-hourly refresh) |
 | `users.py` | Accounts, roles, password hashing, sessions, login lockout |
 | `data_filter.py` | Cuts `data.json` down to one user's projects; must match `fetch_data.py`'s row layouts |
 | `config.json` / `config.json.example` | SiteSense credentials (local dev only, gitignored) |
